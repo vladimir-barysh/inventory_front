@@ -1,10 +1,11 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import { Header } from './components/header/header.tsx';
 import { Sidebar } from './components/sidebar/sidebar.tsx';
+import { IncomingDocumentsPage } from './pages/documents/documents.tsx';
 
 // Тема (синий акцент)
 const theme = createTheme({
@@ -18,13 +19,46 @@ const theme = createTheme({
   },
 });
 
+// Тип для текущей страницы
+type Page = 'dashboard' | 'incoming' | 'outgoing' | 'products' | 'suppliers' | 'storage' | 'employees' | 'reports';
+
 function App() {
+  const [currentPage, setCurrentPage] = useState<Page>('dashboard');
+
+  // Функция для изменения страницы (будет передана в Sidebar)
+  const handlePageChange = (page: Page) => {
+    setCurrentPage(page);
+  };
+
+  // Рендеринг контента в зависимости от текущей страницы
+  const renderContent = () => {
+    switch (currentPage) {
+      case 'incoming':
+        return <IncomingDocumentsPage />;
+      case 'dashboard':
+      default:
+        return (
+          <Box sx={{ p: 3, backgroundColor: 'white', borderRadius: 1, boxShadow: 1 }}>
+            <Typography variant="h5" gutterBottom sx={{ fontWeight: 500 }}>
+              Добро пожаловать в систему управления складом "СкладПро"
+            </Typography>
+            <Typography paragraph color="text.secondary">
+              ООО «Склад» Проспект Ленина, 46
+            </Typography>
+            <Typography paragraph>
+              Выберите раздел в боковом меню для работы с документами и справочниками
+            </Typography>
+          </Box>
+        );
+    }
+  };
+
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
       <Box sx={{ display: 'flex' }}>
         <Header />
-        <Sidebar />
+        <Sidebar onPageChange={handlePageChange} currentPage={currentPage} />
         
         <Box 
           component="main" 
@@ -36,15 +70,7 @@ function App() {
             minHeight: '100vh',
           }}
         >
-          {/* Основной контент */}
-          <Box sx={{ p: 3, backgroundColor: 'white', borderRadius: 1, boxShadow: 1 }}>
-            <Typography variant="h5" gutterBottom sx={{ fontWeight: 500 }}>
-              Добро пожаловать в систему управления складом "СкладПро"
-            </Typography>
-            <Typography paragraph color="text.secondary">
-              ООО «Склад» Проспект Ленина, 46
-            </Typography>
-          </Box>
+          {renderContent()}
         </Box>
       </Box>
     </ThemeProvider>

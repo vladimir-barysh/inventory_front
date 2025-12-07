@@ -13,16 +13,16 @@ import {
   Inventory,
   LocalShipping,
   Assessment,
-  Input,
-  Output,
   Warehouse,
   People,
+  Folder
 } from '@mui/icons-material';
 
 // Типы для меню
 interface MenuItem {
   text: string;
   icon: React.ReactElement;
+  page: 'dashboard' | 'incoming' | 'outgoing' | 'products' | 'suppliers' | 'storage' | 'employees' | 'reports';
 }
 
 interface MenuSection {
@@ -30,37 +30,48 @@ interface MenuSection {
   items: MenuItem[];
 }
 
+interface SidebarProps {
+  width?: number;
+  onPageChange?: (page: 'dashboard' | 'incoming' | 'outgoing' | 'products' | 'suppliers' | 'storage' | 'employees' | 'reports') => void;
+  currentPage?: 'dashboard' | 'incoming' | 'outgoing' | 'products' | 'suppliers' | 'storage' | 'employees' | 'reports';
+}
+
 // Левое боковое меню
 const menuSections: MenuSection[] = [
   {
     title: 'Документы',
     items: [
-      { text: 'Входные', icon: <Input /> },
-      { text: 'Исходящие', icon: <Output /> },
+      { text: 'Документы', icon: <Folder />, page: 'incoming' },
     ]
   },
   {
     title: 'Справочники',
     items: [
-      { text: 'Товары', icon: <Inventory /> },
-      { text: 'Поставщики', icon: <LocalShipping /> },
-      { text: 'Зоны хранения', icon: <Warehouse /> },
-      { text: 'Сотрудники', icon: <People /> },
+      { text: 'Товары', icon: <Inventory />, page: 'products' },
+      { text: 'Поставщики', icon: <LocalShipping />, page: 'suppliers' },
+      { text: 'Зоны хранения', icon: <Warehouse />, page: 'storage' },
+      { text: 'Сотрудники', icon: <People />, page: 'employees' },
     ]
   },
   {
     title: 'Аналитика',
     items: [
-      { text: 'Отчёты', icon: <Assessment /> },
+      { text: 'Отчёты', icon: <Assessment />, page: 'reports' },
     ]
   }
 ];
 
-interface SidebarProps {
-  width?: number;
-}
+export const Sidebar: React.FC<SidebarProps> = ({ 
+  width = 220, 
+  onPageChange,
+  currentPage = 'dashboard'
+}) => {
+  const handleItemClick = (page: 'dashboard' | 'incoming' | 'outgoing' | 'products' | 'suppliers' | 'storage' | 'employees' | 'reports') => {
+    if (onPageChange) {
+      onPageChange(page);
+    }
+  };
 
-export const Sidebar: React.FC<SidebarProps> = ({ width = 280 }) => {
   return (
     <Drawer
       variant="permanent"
@@ -98,15 +109,27 @@ export const Sidebar: React.FC<SidebarProps> = ({ width = 280 }) => {
               {section.items.map((item) => (
                 <ListItemButton 
                   key={item.text}
+                  onClick={() => handleItemClick(item.page)}
+                  selected={currentPage === item.page}
                   sx={{
                     py: 1.5,
                     px: 3,
                     '&:hover': {
                       backgroundColor: 'rgba(25, 118, 210, 0.08)',
                     },
+                    '&.Mui-selected': {
+                      backgroundColor: 'rgba(25, 118, 210, 0.12)',
+                      borderRight: '3px solid #1976d2',
+                      '&:hover': {
+                        backgroundColor: 'rgba(25, 118, 210, 0.16)',
+                      },
+                    },
                   }}
                 >
-                  <ListItemIcon sx={{ minWidth: 40, color: '#1976d2' }}>
+                  <ListItemIcon sx={{ 
+                    minWidth: 40, 
+                    color: currentPage === item.page ? '#1976d2' : '#1976d2' 
+                  }}>
                     {item.icon}
                   </ListItemIcon>
                   <ListItemText 
@@ -114,7 +137,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ width = 280 }) => {
                     sx={{
                       '& .MuiListItemText-primary': {
                         fontSize: '0.95rem',
-                        color: '#333',
+                        color: currentPage === item.page ? '#1976d2' : '#333',
+                        fontWeight: currentPage === item.page ? 600 : 400,
                       }
                     }}
                   />
