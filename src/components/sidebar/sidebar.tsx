@@ -13,7 +13,6 @@ import {
 import {
   Inventory,
   LocalShipping,
-  Assessment,
   Warehouse,
   People,
   Folder
@@ -52,12 +51,6 @@ const menuSections: MenuSection[] = [
       { text: 'Сотрудники', icon: <People />, path: '/employees' },
     ]
   },
-  {
-    title: 'Аналитика',
-    items: [
-      { text: 'Отчёты', icon: <Assessment />, path: '/reports' },
-    ]
-  }
 ];
 
 export const Sidebar: React.FC<SidebarProps> = ({ 

@@ -5,7 +5,7 @@ import CssBaseline from '@mui/material/CssBaseline';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import { Header, Sidebar } from './components';
-import { IncomingDocumentsPage } from './pages';
+import { IncomingDocumentsPage, SuppliersPage} from './pages';
 import { theme } from './theme'; // Импорт темы
 
 function App() {
@@ -47,6 +47,7 @@ function App() {
                 </Box>
               } />
               <Route path="/documents" element={<IncomingDocumentsPage />} />
+              <Route path="/suppliers" element={<SuppliersPage />} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
           </Box>

@@ -34,7 +34,7 @@ import {
   DateRange,
   Description,
 } from '@mui/icons-material';
-import { MenuSection, SecondSidebar } from './../../components';
+import { MenuSection, SecondSidebar } from '../../components';
 import { Document, documents } from './makeData';
 
 // Компонент для отображения статуса
@@ -95,11 +95,11 @@ const sidebarMenu: MenuSection[] = [
     ]
   },
   { 
-    title: 'Исходящие',
+    title: 'Отчёты',
     items: [
-      { text: 'Отчеты об остатках товаров на складе' },
-      { text: 'Отчеты о движении товаров' },
-      { text: 'Отчеты о товарах с истекающим сроком годности' },
+      { text: 'Об остатках товаров на складе' },
+      { text: 'О движении товаров' },
+      { text: 'О товарах с истекающим сроком годности' },
     ]
   },
 ];
