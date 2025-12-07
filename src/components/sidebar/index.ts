@@ -1,1 +1,1 @@
-export * from './sidebar.tsx';
+export * from './sidebar';

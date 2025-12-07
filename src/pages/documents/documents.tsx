@@ -34,8 +34,8 @@ import {
   DateRange,
   Description,
 } from '@mui/icons-material';
-import { MenuSection, SecondSidebar } from './../../components/secondSidebar/secondSidebar.tsx';
-import { Document, documents } from './makeData.ts';
+import { MenuSection, SecondSidebar } from './../../components';
+import { Document, documents } from './makeData';
 
 // Компонент для отображения статуса
 const StatusChip: React.FC<{ status: Document['статус'] }> = ({ status }) => {
@@ -193,10 +193,6 @@ export const IncomingDocumentsPage: React.FC = () => {
       }}>
         {/* Заголовок и панель управления */}
         <Box sx={{ mb: 4 }}>
-          <Typography color="text.secondary" paragraph>
-            Управление приходными накладными, актами, заявками и отчётами
-          </Typography>
-          
           {/* Панель поиска и фильтров */}
           <Paper sx={{ p: 2, mb: 3 }}>
             <Box sx={{ 

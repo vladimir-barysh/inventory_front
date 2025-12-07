@@ -1,4 +1,5 @@
 import React from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import {
   Drawer,
   List,
@@ -22,7 +23,7 @@ import {
 interface MenuItem {
   text: string;
   icon: React.ReactElement;
-  page: 'dashboard' | 'incoming' | 'outgoing' | 'products' | 'suppliers' | 'storage' | 'employees' | 'reports';
+  path: string; // Изменяем page на path
 }
 
 interface MenuSection {
@@ -32,8 +33,6 @@ interface MenuSection {
 
 interface SidebarProps {
   width?: number;
-  onPageChange?: (page: 'dashboard' | 'incoming' | 'outgoing' | 'products' | 'suppliers' | 'storage' | 'employees' | 'reports') => void;
-  currentPage?: 'dashboard' | 'incoming' | 'outgoing' | 'products' | 'suppliers' | 'storage' | 'employees' | 'reports';
 }
 
 // Левое боковое меню
@@ -41,35 +40,34 @@ const menuSections: MenuSection[] = [
   {
     title: 'Документы',
     items: [
-      { text: 'Документы', icon: <Folder />, page: 'incoming' },
+      { text: 'Документы', icon: <Folder />, path: '/documents' },
     ]
   },
   {
     title: 'Справочники',
     items: [
-      { text: 'Товары', icon: <Inventory />, page: 'products' },
-      { text: 'Поставщики', icon: <LocalShipping />, page: 'suppliers' },
-      { text: 'Зоны хранения', icon: <Warehouse />, page: 'storage' },
-      { text: 'Сотрудники', icon: <People />, page: 'employees' },
+      { text: 'Товары', icon: <Inventory />, path: '/products' },
+      { text: 'Поставщики', icon: <LocalShipping />, path: '/suppliers' },
+      { text: 'Зоны хранения', icon: <Warehouse />, path: '/storage' },
+      { text: 'Сотрудники', icon: <People />, path: '/employees' },
     ]
   },
   {
     title: 'Аналитика',
     items: [
-      { text: 'Отчёты', icon: <Assessment />, page: 'reports' },
+      { text: 'Отчёты', icon: <Assessment />, path: '/reports' },
     ]
   }
 ];
 
 export const Sidebar: React.FC<SidebarProps> = ({ 
-  width = 220, 
-  onPageChange,
-  currentPage = 'dashboard'
+  width = 220,
 }) => {
-  const handleItemClick = (page: 'dashboard' | 'incoming' | 'outgoing' | 'products' | 'suppliers' | 'storage' | 'employees' | 'reports') => {
-    if (onPageChange) {
-      onPageChange(page);
-    }
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  const handleItemClick = (path: string) => {
+    navigate(path);
   };
 
   return (
@@ -106,44 +104,47 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </Typography>
             </Box>
             <List sx={{ py: 0 }}>
-              {section.items.map((item) => (
-                <ListItemButton 
-                  key={item.text}
-                  onClick={() => handleItemClick(item.page)}
-                  selected={currentPage === item.page}
-                  sx={{
-                    py: 1.5,
-                    px: 3,
-                    '&:hover': {
-                      backgroundColor: 'rgba(25, 118, 210, 0.08)',
-                    },
-                    '&.Mui-selected': {
-                      backgroundColor: 'rgba(25, 118, 210, 0.12)',
-                      borderRight: '3px solid #1976d2',
-                      '&:hover': {
-                        backgroundColor: 'rgba(25, 118, 210, 0.16)',
-                      },
-                    },
-                  }}
-                >
-                  <ListItemIcon sx={{ 
-                    minWidth: 40, 
-                    color: currentPage === item.page ? '#1976d2' : '#1976d2' 
-                  }}>
-                    {item.icon}
-                  </ListItemIcon>
-                  <ListItemText 
-                    primary={item.text} 
+              {section.items.map((item) => {
+                const isSelected = location.pathname === item.path;
+                return (
+                  <ListItemButton 
+                    key={item.text}
+                    onClick={() => handleItemClick(item.path)}
+                    selected={isSelected}
                     sx={{
-                      '& .MuiListItemText-primary': {
-                        fontSize: '0.95rem',
-                        color: currentPage === item.page ? '#1976d2' : '#333',
-                        fontWeight: currentPage === item.page ? 600 : 400,
-                      }
+                      py: 1.5,
+                      px: 3,
+                      '&:hover': {
+                        backgroundColor: 'rgba(25, 118, 210, 0.08)',
+                      },
+                      '&.Mui-selected': {
+                        backgroundColor: 'rgba(25, 118, 210, 0.12)',
+                        borderRight: '3px solid #1976d2',
+                        '&:hover': {
+                          backgroundColor: 'rgba(25, 118, 210, 0.16)',
+                        },
+                      },
                     }}
-                  />
-                </ListItemButton>
-              ))}
+                  >
+                    <ListItemIcon sx={{ 
+                      minWidth: 40, 
+                      color: isSelected ? '#1976d2' : '#1976d2' 
+                    }}>
+                      {item.icon}
+                    </ListItemIcon>
+                    <ListItemText 
+                      primary={item.text} 
+                      sx={{
+                        '& .MuiListItemText-primary': {
+                          fontSize: '0.95rem',
+                          color: isSelected ? '#1976d2' : '#333',
+                          fontWeight: isSelected ? 600 : 400,
+                        }
+                      }}
+                    />
+                  </ListItemButton>
+                );
+              })}
             </List>
             {index < menuSections.length - 1 && (
               <Divider sx={{ my: 1 }} />
