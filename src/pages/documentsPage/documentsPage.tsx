@@ -153,7 +153,7 @@ const DocumentDialog: React.FC<DocumentDialogProps> = ({
               <MenuItem value="расходная">Расходная накладная</MenuItem>
               <MenuItem value="инвентаризация">Акт инвентаризации</MenuItem>
               <MenuItem value="списание">Акт списания</MenuItem>
-              <MenuItem value="перемещение">Накладная на перемещение</MenuItem>
+              <MenuItem value="перемещение">Заявка на перемещение</MenuItem>
               <MenuItem value="отчёт">Отчёт</MenuItem>
             </Select>
           </FormControl>
@@ -285,7 +285,7 @@ export const DocumentsPage: React.FC = () => {
           count: documents.filter(d => d.тип === 'списание').length,
         },
         {
-          text: 'Накладные на перемещение',
+          text: 'Заявки на перемещение',
           icon: <Description />,
           count: documents.filter(d => d.тип === 'перемещение').length,
         },
@@ -381,13 +381,11 @@ export const DocumentsPage: React.FC = () => {
       'Расходные накладные': 'расходная',
       'Акты инвентаризации': 'инвентаризация',
       'Акты списания': 'списание',
-      'Накладные на перемещение': 'перемещение',
+      'Заявки на перемещение': 'перемещение',
       'Отчёты': 'Отчёты', // Специальное значение для всех отчетов
       'Остатки товаров на складе': 'отчёт',
       'Движение товаров': 'отчёт',
       'Товары с истекающим сроком годности': 'отчёт',
-      'Отчёт по продажам': 'отчёт',
-      'Отчёт по поставщикам': 'отчёт',
     };
 
     const mappedType = typeMap[category];
