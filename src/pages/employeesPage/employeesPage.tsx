@@ -450,7 +450,7 @@ export const EmployeesPage: React.FC = () => {
               onClick={handleAddEmployee}
               sx={{ 
                 backgroundColor: '#1976d2',
-                minWidth: 120,
+                minWidth: 170,
                 alignSelf: { xs: 'stretch', md: 'center' }
               }}
             >

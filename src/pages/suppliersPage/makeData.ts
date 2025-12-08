@@ -26,3 +26,31 @@ export interface SupplierFormData {
   email: string;
   адрес: string;
 }
+
+// Конфигурация для типов организации
+export const typeConfig = {
+  'ООО': { 
+    bgColor: '#e3f2fd', 
+    color: '#1565c0',
+    icon: '🏢',
+    label: 'ООО'
+  },
+  'ИП': { 
+    bgColor: '#f3e5f5', 
+    color: '#7b1fa2',
+    icon: '👤',
+    label: 'ИП'
+  },
+  'АО': { 
+    bgColor: '#e8f5e9', 
+    color: '#2e7d32',
+    icon: '🏛️',
+    label: 'АО'
+  },
+  'ЗАО': { 
+    bgColor: '#fff3e0', 
+    color: '#ef6c00',
+    icon: '🔒',
+    label: 'ЗАО'
+  },
+};

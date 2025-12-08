@@ -1,4 +1,3 @@
-// src/pages/suppliers/SuppliersPage.tsx
 import React, { useState } from 'react';
 import {
   Box,
@@ -41,25 +40,23 @@ import {
   Email,
   LocationOn,
 } from '@mui/icons-material';
-import { Supplier, suppliersData, SupplierFormData } from './makeData';
+import { Supplier, suppliersData, SupplierFormData, typeConfig } from './makeData';
 
 // Компонент для типа организации
 const TypeChip: React.FC<{ type: Supplier['тип'] }> = ({ type }) => {
-  const typeConfig = {
-    'ООО': { bgcolor: '#e3f2fd', color: '#1565c0' },
-    'ИП': { bgcolor: '#f3e5f5', color: '#7b1fa2' },
-    'АО': { bgcolor: '#e8f5e9', color: '#2e7d32' },
-    'ЗАО': { bgcolor: '#fff3e0', color: '#ef6c00' },
-  };
-
   const config = typeConfig[type];
   
   return (
     <Chip
-      label={type}
+      label={
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+          <span>{config.icon}</span>
+          <span>{config.label}</span>
+        </Box>
+      }
       size="small"
       sx={{
-        backgroundColor: config.bgcolor,
+        backgroundColor: config.bgColor,
         color: config.color,
         fontWeight: 500,
       }}
@@ -117,10 +114,14 @@ const SupplierDialog: React.FC<SupplierDialogProps> = ({
               label="Тип организации"
               onChange={(e) => handleChange('тип', e.target.value)}
             >
-              <MenuItem value="ООО">ООО</MenuItem>
-              <MenuItem value="ИП">ИП</MenuItem>
-              <MenuItem value="АО">АО</MenuItem>
-              <MenuItem value="ЗАО">ЗАО</MenuItem>
+              {Object.entries(typeConfig).map(([key, config]) => (
+                <MenuItem key={key} value={key}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <span>{config.icon}</span>
+                    <Typography>{config.label}</Typography>
+                  </Box>
+                </MenuItem>
+              ))}
             </Select>
           </FormControl>
 
@@ -298,67 +299,67 @@ export const SuppliersPage: React.FC = () => {
         
         {/* Панель поиска и управления */}
         <Paper sx={{ p: 2, mb: 3 }}>
-        <Box sx={{ 
+          <Box sx={{ 
             display: 'flex', 
             flexDirection: { xs: 'column', md: 'row' }, 
             gap: 2, 
             alignItems: { xs: 'stretch', md: 'center' },
             justifyContent: 'space-between'
-        }}>
+          }}>
             {/* Поле поиска */}
             <TextField
-            placeholder="Поиск по названию, контактному лицу, телефону, почте"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            InputProps={{
+              placeholder="Поиск по названию, контактному лицу, телефону, почте"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              InputProps={{
                 startAdornment: (
-                <InputAdornment position="start">
+                  <InputAdornment position="start">
                     <Search />
-                </InputAdornment>
+                  </InputAdornment>
                 ),
-            }}
-            sx={{ 
+              }}
+              sx={{ 
                 width: { xs: '100%', md: 550 },
                 '& .MuiOutlinedInput-root': {
-                backgroundColor: 'white',
+                  backgroundColor: 'white',
                 }
-            }}
+              }}
             />
             
             {/* Статистика */}
             <Box sx={{ 
-            display: 'flex', 
-            gap: 1,
-            flexWrap: 'wrap',
-            justifyContent: { xs: 'center', md: 'flex-start' }
+              display: 'flex', 
+              gap: 1,
+              flexWrap: 'wrap',
+              justifyContent: { xs: 'center', md: 'flex-start' }
             }}>
-            <Chip 
+              <Chip 
                 label={`Всего: ${suppliers.length}`}
                 variant="outlined"
                 sx={{ minWidth: 120, justifyContent: 'center' }}
-            />
-            <Chip 
+              />
+              <Chip 
                 label={`Найдено: ${filteredSuppliers.length}`}
                 variant="outlined"
                 color="primary"
                 sx={{ minWidth: 120, justifyContent: 'center' }}
-            />
+              />
             </Box>
             
             {/* Кнопка добавления */}
             <Button
-            variant="contained"
-            startIcon={<Add />}
-            onClick={handleAddSupplier}
-            sx={{ 
+              variant="contained"
+              startIcon={<Add />}
+              onClick={handleAddSupplier}
+              sx={{ 
                 backgroundColor: '#1976d2',
                 minWidth: 170,
                 alignSelf: { xs: 'stretch', md: 'center' }
-            }}
+              }}
             >
-            Добавить
+              Добавить
             </Button>
-        </Box>
+          </Box>
         </Paper>
       </Box>
       
@@ -390,7 +391,7 @@ export const SuppliersPage: React.FC = () => {
                       <TypeChip type={supplier.тип} />
                     </TableCell>
                     <TableCell>
-                      <Typography fontWeight={500}>
+                      <Typography fontWeight={600}>
                         {supplier.наименование}
                       </Typography>
                     </TableCell>
@@ -429,6 +430,43 @@ export const SuppliersPage: React.FC = () => {
             `${from}-${to} из ${count}`
           }
         />
+      </Paper>
+
+      {/* Статистика по типам поставщиков */}
+      <Paper sx={{ mt: 3, p: 2 }}>
+        <Typography variant="subtitle1" fontWeight={600} gutterBottom>
+          Распределение поставщиков по типам организаций
+        </Typography>
+        <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+          {Object.entries(typeConfig).map(([key, config]) => {
+            const count = suppliers.filter(s => s.тип === key).length;
+            return (
+              <Paper 
+                key={key}
+                elevation={0}
+                sx={{ 
+                  p: 2, 
+                  flex: 1, 
+                  minWidth: 200,
+                  backgroundColor: config.bgColor,
+                  border: '1px solid',
+                  borderColor: config.color,
+                  borderRadius: 2
+                }}
+              >
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                  <Typography variant="h4">{config.icon}</Typography>
+                  <Typography variant="h5" fontWeight={600} color={config.color}>
+                    {count}
+                  </Typography>
+                </Box>
+                <Typography variant="body2" fontWeight={500}>
+                  {config.label}
+                </Typography>
+              </Paper>
+            );
+          })}
+        </Box>
       </Paper>
 
       {/* Меню действий для поставщика */}

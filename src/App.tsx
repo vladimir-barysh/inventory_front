@@ -50,7 +50,7 @@ function App() {
               <Route path="/suppliers" element={<SuppliersPage />} />
               <Route path="/storage" element={<StoragePage />} />
               <Route path="*" element={<Navigate to="/" replace />} />
-              <Route path="/employees" element={<EmployeesPage />} />
+              <Route path="/employees" element={<EmployeesPage />} /> 
             </Routes>
           </Box>
         </Box>
