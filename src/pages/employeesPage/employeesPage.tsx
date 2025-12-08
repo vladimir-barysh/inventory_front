@@ -387,9 +387,9 @@ export const EmployeesPage: React.FC = () => {
   };
 
   return (
-    <Box sx={{ p: 3 }}>
+    <Box>
       {/* Заголовок и панель управления */}
-      <Box sx={{ mb: 4 }}>
+      <Box>
         <Typography color="text.secondary" paragraph>
           Управление сотрудниками: добавление, редактирование и удаление записей
         </Typography>

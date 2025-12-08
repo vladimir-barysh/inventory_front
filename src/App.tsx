@@ -24,7 +24,7 @@ function App() {
               p: 3, 
               mt: 8, // Отступ для AppBar
               backgroundColor: theme.palette.background.default,
-              minHeight: '100vh',
+              minHeight: '90vh',
             }}
           >
             <Routes>

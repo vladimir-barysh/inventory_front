@@ -259,9 +259,9 @@ export const StoragePage: React.FC = () => {
 
   // Статистика
   return (
-    <Box sx={{ p: 3 }}>
+    <Box>
       {/* Заголовок и панель управления */}
-      <Box sx={{ mb: 4 }}>
+      <Box>
         <Typography color="text.secondary" paragraph>
           Управление зонами хранения на складе: добавление, редактирование и удаление
         </Typography>
