@@ -414,7 +414,7 @@ export const ProductsPage: React.FC = () => {
       />
 
       {/* Основной контент */}
-      <Box sx={{ flex: 1, p: 3, overflow: 'auto' }}>
+      <Box sx={{ flex: 1, pl: 3, overflow: 'auto' }}>
         {/* Заголовок и панель управления */}
         <Box sx={{ mb: 4 }}>
           <Typography color="text.secondary" paragraph>
