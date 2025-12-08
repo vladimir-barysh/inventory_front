@@ -398,7 +398,7 @@ export const DocumentsPage: React.FC = () => {
   };
 
   return (
-    <Box sx={{ display: 'flex', height: 'calc(100vh - 64px)' }}>
+    <Box sx={{ display: 'flex', height: '88vh' }}>
       {/* Второстепенный сайдбар с типами документов */}
       <SecondSidebar
         sections={categorySections}
