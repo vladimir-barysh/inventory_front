@@ -5,7 +5,7 @@ import CssBaseline from '@mui/material/CssBaseline';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import { Header, Sidebar } from './components';
-import { IncomingDocumentsPage, SuppliersPage, StoragePage, EmployeesPage, ProductsPage } from './pages';
+import { DocumentsPage, SuppliersPage, StoragePage, EmployeesPage, ProductsPage } from './pages';
 import { theme } from './theme'; // Импорт темы
 
 function App() {
@@ -46,7 +46,7 @@ function App() {
                   </Typography>
                 </Box>
               } />
-              <Route path="/documents" element={<IncomingDocumentsPage />} />
+              <Route path="/documents" element={<DocumentsPage />} />
               <Route path="/suppliers" element={<SuppliersPage />} />
               <Route path="/storage" element={<StoragePage />} />
               <Route path="/employees" element={<EmployeesPage />} />
