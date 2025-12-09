@@ -1,5 +1,4 @@
-// src/pages/documents/DocumentsPage.tsx
-import React, { useState } from 'react';
+import React, { useState} from 'react';
 import {
   Box,
   Typography,
@@ -41,9 +40,13 @@ import {
   Assessment,
   Download,
   Print,
+  ShoppingCart,
+  Inventory,
+  RemoveCircle,
+  ArrowForward,
 } from '@mui/icons-material';
-import { SecondSidebar } from './../../components';
-import { Document, documentsData, DocumentFormData } from './makeData';
+import { SecondSidebar, FillDocumentDialog } from './../../components';
+import { Document, documentsData, DocumentFormData, mockProducts } from './makeData';
 
 // Типы для категорий документов
 interface CategoryItem {
@@ -191,36 +194,36 @@ const DocumentDialog: React.FC<DocumentDialogProps> = ({
 };
 
 // Компонент для отображения типа документа
-const DocumentTypeChip: React.FC<{ type: Document['тип'] }> = ({ type }) => {
+const DocumentTypeChip: React.FC<{ type: Document['тип']}> = ({ type}) => {
   const typeConfig = {
     'приходная': { 
       bgColor: '#d4edda', 
       color: '#155724',
-      icon: <Description fontSize="small" />,
+      icon: <ShoppingCart fontSize="small" />,
       label: 'Приходная'
     },
     'расходная': { 
       bgColor: '#f8d7da', 
       color: '#721c24',
-      icon: <Description fontSize="small" />,
+      icon: <ShoppingCart fontSize="small" />,
       label: 'Расходная'
     },
     'инвентаризация': { 
       bgColor: '#fff3cd', 
       color: '#856404',
-      icon: <Description fontSize="small" />,
+      icon: <Inventory fontSize="small" />,
       label: 'Инвентаризация'
     },
     'списание': { 
       bgColor: '#d1ecf1', 
       color: '#0c5460',
-      icon: <Description fontSize="small" />,
+      icon: <RemoveCircle fontSize="small" />,
       label: 'Списание'
     },
     'перемещение': { 
       bgColor: '#cce5ff', 
       color: '#004085',
-      icon: <Description fontSize="small" />,
+      icon: <ArrowForward fontSize="small" />,
       label: 'Перемещение'
     },
     'отчёт': { 
@@ -234,16 +237,18 @@ const DocumentTypeChip: React.FC<{ type: Document['тип'] }> = ({ type }) => {
   const config = typeConfig[type];
   
   return (
-    <Chip
-      icon={config.icon}
-      label={config.label}
-      size="small"
-      sx={{
-        backgroundColor: config.bgColor,
-        color: config.color,
-        fontWeight: 500,
-      }}
-    />
+    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+      <Chip
+        icon={config.icon}
+        label={config.label}
+        size="small"
+        sx={{
+          backgroundColor: config.bgColor,
+          color: config.color,
+          fontWeight: 500,
+        }}
+      />
+    </Box>
   );
 };
 
@@ -254,6 +259,7 @@ export const DocumentsPage: React.FC = () => {
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const [selectedDocument, setSelectedDocument] = useState<Document | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [fillDialogOpen, setFillDialogOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -292,9 +298,12 @@ export const DocumentsPage: React.FC = () => {
         {
           text: 'Отчёты',
           icon: <Description />,
-          count: documents.filter(d => d.тип === 'перемещение').length,
-           children: [
-            'Остатки товаров на складе', 'Движение товаров', 'Товары с истекающим сроком годности'],
+          count: documents.filter(d => d.тип === 'отчёт').length,
+          children: [
+            'Остатки товаров на складе', 
+            'Движение товаров', 
+            'Товары с истекающим сроком годности'
+          ],
         },
       ],
     },
@@ -304,7 +313,11 @@ export const DocumentsPage: React.FC = () => {
   const filteredDocuments = documents.filter(document => {
     const matchesSearch =
       document.номер.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      document.комментарий.toLowerCase().includes(searchTerm.toLowerCase());
+      document.комментарий.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (document.строки && document.строки.some(line => 
+        line.наименование.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        line.артикул.toLowerCase().includes(searchTerm.toLowerCase())
+      ));
 
     const matchesType = !selectedType || 
       (selectedType === 'Отчёты' && document.тип === 'отчёт') ||
@@ -397,6 +410,51 @@ export const DocumentsPage: React.FC = () => {
     setPage(0);
   };
 
+  // Обработчик двойного клика по строке таблицы
+  const handleRowDoubleClick = (document: Document) => {
+    if (document.тип !== 'отчёт') { // Отчеты не заполняются
+      setSelectedDocument(document);
+      setFillDialogOpen(true);
+    }
+  };
+
+  // Функция сохранения заполненного документа
+  const handleSaveFilledDocument = (updatedDocument: Document) => {
+    setDocuments(prev => prev.map(d =>
+      d.id === updatedDocument.id ? updatedDocument : d
+    ));
+  };
+
+  // Функция для получения количества строк в документе
+  const getDocumentLinesCount = (document: Document) => {
+    return document.строки ? document.строки.length : 0;
+  };
+
+  // Функция для получения суммы документа
+  const getDocumentTotalAmount = (document: Document) => {
+    if (!document.строки || document.строки.length === 0) return 0;
+    
+    return document.строки.reduce((sum, line) => {
+      // Обрабатываем каждый тип строки по отдельности
+      switch (line.тип) {
+        case 'приходная':
+          return sum + line.сумма;
+        case 'расходная':
+          return sum + line.сумма;
+        case 'инвентаризация':
+          // Для инвентаризации используем сумму по учету
+          return sum + line.суммаПоУчету;
+        case 'перемещение':
+          // Для перемещения нет суммы, возвращаем 0
+          return sum + 0;
+        case 'списание':
+          return sum + line.сумма;
+        default:
+          return sum + 0;
+      }
+    }, 0);
+  };
+
   return (
     <Box sx={{ display: 'flex', height: '88vh' }}>
       {/* Второстепенный сайдбар с типами документов */}
@@ -425,7 +483,7 @@ export const DocumentsPage: React.FC = () => {
             }}>
               {/* Поле поиска */}
               <TextField
-                placeholder="Поиск по номеру или комментарию..."
+                placeholder="Поиск по номеру, комментарию или товару..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 InputProps={{
@@ -486,11 +544,13 @@ export const DocumentsPage: React.FC = () => {
             <Table stickyHeader>
               <TableHead>
                 <TableRow>
-                  <TableCell>Номер документа</TableCell>
-                  <TableCell>Дата</TableCell>
-                  <TableCell>Тип документа</TableCell>
+                  <TableCell width="180px">Номер документа</TableCell>
+                  <TableCell width="100px">Дата</TableCell>
+                  <TableCell width="140px">Тип документа</TableCell>
+                  <TableCell width="80px">Строк</TableCell>
+                  <TableCell width="120px">Сумма</TableCell>
                   <TableCell>Комментарий</TableCell>
-                  <TableCell align="right">Действия</TableCell>
+                  <TableCell width="80px" align="right">Действия</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -500,12 +560,21 @@ export const DocumentsPage: React.FC = () => {
                     <TableRow
                       key={document.id}
                       hover
-                      sx={{ cursor: 'pointer', '&:hover': { backgroundColor: 'action.hover' } }}
+                      sx={{ 
+                        cursor: document.тип !== 'отчёт' ? 'pointer' : 'default',
+                        '&:hover': { backgroundColor: 'action.hover' }
+                      }}
+                      onDoubleClick={() => handleRowDoubleClick(document)}
                     >
                       <TableCell>
                         <Typography variant="body2" fontWeight={600}>
                           {document.номер}
                         </Typography>
+                        {document.тип === 'отчёт' && (
+                          <Typography variant="caption" color="text.secondary">
+                            Двойной клик не доступен
+                          </Typography>
+                        )}
                       </TableCell>
                       <TableCell>
                         <Typography variant="body2">
@@ -516,9 +585,25 @@ export const DocumentsPage: React.FC = () => {
                         <DocumentTypeChip type={document.тип} />
                       </TableCell>
                       <TableCell>
+                        <Typography variant="body2" align="center">
+                          {getDocumentLinesCount(document)}
+                        </Typography>
+                      </TableCell>
+                      <TableCell>
+                        <Typography variant="body2" fontWeight={600}>
+                          {getDocumentTotalAmount(document).toLocaleString('ru-RU')} ₽
+                        </Typography>
+                      </TableCell>
+                      <TableCell>
                         <Typography variant="body2" color="text.secondary">
                           {document.комментарий}
                         </Typography>
+                        {document.строки && document.строки.length > 0 && (
+                          <Typography variant="caption" color="text.secondary" display="block">
+                            Товаров: {document.строки.length} | 
+                            Общее кол-во: {document.строки.reduce((sum, line) => sum + line.количество, 0)}
+                          </Typography>
+                        )}
                       </TableCell>
                       <TableCell align="right">
                         <IconButton
@@ -559,8 +644,19 @@ export const DocumentsPage: React.FC = () => {
             <ListItemIcon>
               <Edit fontSize="small" />
             </ListItemIcon>
-            <ListItemText>Редактировать</ListItemText>
+            <ListItemText>Редактировать документ</ListItemText>
           </MenuItem>
+          {selectedDocument && selectedDocument.тип !== 'отчёт' && (
+            <MenuItem onClick={() => {
+              handleRowDoubleClick(selectedDocument);
+              handleMenuClose();
+            }}>
+              <ListItemIcon>
+                <Description fontSize="small" />
+              </ListItemIcon>
+              <ListItemText>Заполнить документ</ListItemText>
+            </MenuItem>
+          )}
           {selectedDocument?.тип === 'отчёт' && (
             <MenuItem onClick={() => {
               console.log('Скачать отчет:', selectedDocument);
@@ -600,6 +696,20 @@ export const DocumentsPage: React.FC = () => {
           isEdit={isEditing}
         />
 
+        {/* Диалог заполнения документа */}
+        {selectedDocument && (
+          <FillDocumentDialog
+            open={fillDialogOpen}
+            onClose={() => {
+              setFillDialogOpen(false);
+              setSelectedDocument(null);
+            }}
+            document={selectedDocument}
+            products={mockProducts}
+            onSave={handleSaveFilledDocument}
+          />
+        )}
+
         {/* Диалог подтверждения удаления */}
         <Dialog open={deleteDialogOpen} onClose={() => setDeleteDialogOpen(false)}>
           <DialogTitle>Подтверждение удаления</DialogTitle>
@@ -619,6 +729,11 @@ export const DocumentsPage: React.FC = () => {
                 <Typography variant="body2" color="text.secondary">
                   <strong>Комментарий:</strong> {selectedDocument.комментарий}
                 </Typography>
+                {selectedDocument.строки && selectedDocument.строки.length > 0 && (
+                  <Typography variant="body2" color="text.secondary">
+                    <strong>Строк товаров:</strong> {selectedDocument.строки.length}
+                  </Typography>
+                )}
               </Box>
             )}
           </DialogContent>
