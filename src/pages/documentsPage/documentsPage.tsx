@@ -433,7 +433,26 @@ export const DocumentsPage: React.FC = () => {
   // Функция для получения суммы документа
   const getDocumentTotalAmount = (document: Document) => {
     if (!document.строки || document.строки.length === 0) return 0;
-    return document.строки.reduce((sum, line) => sum + line.сумма, 0);
+    
+    return document.строки.reduce((sum, line) => {
+      // Обрабатываем каждый тип строки по отдельности
+      switch (line.тип) {
+        case 'приходная':
+          return sum + line.сумма;
+        case 'расходная':
+          return sum + line.сумма;
+        case 'инвентаризация':
+          // Для инвентаризации используем сумму по учету
+          return sum + line.суммаПоУчету;
+        case 'перемещение':
+          // Для перемещения нет суммы, возвращаем 0
+          return sum + 0;
+        case 'списание':
+          return sum + line.сумма;
+        default:
+          return sum + 0;
+      }
+    }, 0);
   };
 
   return (
