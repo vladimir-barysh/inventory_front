@@ -168,13 +168,6 @@ export const Header: React.FC<HeaderProps> = ({
 
           {/* Правая часть - иконки пользователя */}
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            
-            <IconButton color="inherit" size="small" sx={{ opacity: 0.9 }}>
-              <Badge badgeContent={3} color="error">
-                <Notifications fontSize="small" />
-              </Badge>
-            </IconButton>
-            
             <Divider 
               orientation="vertical" 
               flexItem 
