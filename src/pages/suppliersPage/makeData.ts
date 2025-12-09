@@ -1,56 +1,58 @@
-export interface Supplier {
+const API_BASE = "http://localhost:8000";
+
+export interface CompanyType {
   id: number;
-  тип: 'ООО' | 'ИП' | 'АО' | 'ЗАО';
-  наименование: string;
-  контактноеЛицо: string;
-  телефон: string;
-  email: string;
-  адрес: string;
+  name: string;
 }
 
-export const suppliersData: Supplier[] = [
-  { id: 1, тип: 'ООО', наименование: '"Поставщик Плюс"', контактноеЛицо: 'Иванов Иван Иванович', телефон: '+7 (999) 123-45-67', email: 'info@postavshik.ru', адрес: 'г. Москва, ул. Ленина, д. 10'},
-  { id: 2, тип: 'ИП', наименование: 'Петров П.П.', контактноеЛицо: 'Петров Петр Петрович', телефон: '+7 (999) 234-56-78', email: 'petrov@mail.ru', адрес: 'г. Санкт-Петербург, Невский пр., д. 25'},
-  { id: 3, тип: 'АО', наименование: '"Торговый Дом"', контактноеЛицо: 'Сидорова Анна Сергеевна', телефон: '+7 (999) 345-67-89', email: 'sidorova@td.ru', адрес: 'г. Екатеринбург, ул. Малышева, д. 45'},
-  { id: 4, тип: 'ЗАО', наименование: '"ПромСнаб"', контактноеЛицо: 'Кузнецов Алексей Викторович', телефон: '+7 (999) 456-78-90', email: 'kuznecov@promsnab.ru', адрес: 'г. Новосибирск, Красный пр., д. 32' },
-  { id: 5, тип: 'ООО', наименование: '"СтройМатериалы"', контактноеЛицо: 'Васильева Мария Ивановна', телефон: '+7 (999) 567-89-01', email: 'vasilieva@stroymat.ru', адрес: 'г. Казань, ул. Баумана, д. 15' },
-  { id: 6, тип: 'ИП', наименование: 'Смирнов С.С.', контактноеЛицо: 'Смирнов Сергей Сергеевич', телефон: '+7 (999) 678-90-12', email: 'smirnov@yandex.ru', адрес: 'г. Нижний Новгород, ул. Большая Покровская, д. 8'},
-];
-
-// Типы для формы добавления/редактирования
-export interface SupplierFormData {
-  тип: 'ООО' | 'ИП' | 'АО' | 'ЗАО';
-  наименование: string;
-  контактноеЛицо: string;
-  телефон: string;
-  email: string;
-  адрес: string;
+export interface Company {
+  id: number;
+  name: string;
+  company_type_id: number;
+  company_type: string | null;
 }
 
-// Конфигурация для типов организации
-export const typeConfig = {
-  'ООО': { 
-    bgColor: '#e3f2fd', 
-    color: '#1565c0',
-    icon: '🏢',
-    label: 'ООО'
-  },
-  'ИП': { 
-    bgColor: '#f3e5f5', 
-    color: '#7b1fa2',
-    icon: '👤',
-    label: 'ИП'
-  },
-  'АО': { 
-    bgColor: '#e8f5e9', 
-    color: '#2e7d32',
-    icon: '🏛️',
-    label: 'АО'
-  },
-  'ЗАО': { 
-    bgColor: '#fff3e0', 
-    color: '#ef6c00',
-    icon: '🔒',
-    label: 'ЗАО'
-  },
+// Получение типов компаний
+export const getCompanyTypes = async (): Promise<CompanyType[]> => {
+  const res = await fetch(`${API_BASE}/companytypes/`);
+  if (!res.ok) throw new Error("Ошибка загрузки типов компаний");
+  return res.json();
+};
+
+// Получение списка компаний
+export const getCompanies = async (): Promise<Company[]> => {
+  const res = await fetch(`${API_BASE}/companies/`);
+  if (!res.ok) throw new Error("Ошибка загрузки компаний");
+  return res.json();
+};
+
+// Создание новой компании
+export const postCompany = async (data: { name: string; company_type_id: number }) => {
+  const res = await fetch(`${API_BASE}/companies/`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new Error("Ошибка создания компании");
+  return res.json();
+};
+
+// Обновление компании
+export const putCompany = async (id: number, data: { name: string; company_type_id: number }) => {
+  const res = await fetch(`${API_BASE}/companies/${id}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new Error("Ошибка обновления компании");
+  return res.json();
+};
+
+// Удаление компании
+export const deleteCompanyById = async (id: number) => {
+  const res = await fetch(`${API_BASE}/companies/${id}`, {
+    method: "DELETE",
+  });
+  if (!res.ok) throw new Error("Ошибка удаления компании");
+  return res.json();
 };
