@@ -26,6 +26,8 @@ import {
 } from '@mui/icons-material';
 
 import {useAuth} from '../../pages/authPage/authContext';
+import AdminOnly from '../AdminOnly';
+import { NewUserDialog } from '../newuser-dialog/newUser'
 
 interface HeaderProps {
   companyName?: string;
@@ -81,14 +83,6 @@ const ProfileDialog: React.FC<ProfileDialogProps> = ({
       </DialogContent>
       <DialogActions sx={{ px: 3, pb: 3 }}>
         <Button 
-          onClick={onClose} 
-          variant="outlined"
-          fullWidth
-          sx={{ mr: 1 }}
-        >
-          Закрыть
-        </Button>
-        <Button 
           onClick={handleLogout}
           variant="contained"
           color="error"
@@ -96,6 +90,15 @@ const ProfileDialog: React.FC<ProfileDialogProps> = ({
           startIcon={<ExitToApp />}
         >
           Выйти из аккаунта
+        </Button>
+
+        <Button 
+          onClick={onClose} 
+          variant="outlined"
+          fullWidth
+          sx={{ mr: 1 }}
+        >
+          Закрыть окно
         </Button>
       </DialogActions>
     </Dialog>
@@ -107,6 +110,7 @@ export const Header: React.FC<HeaderProps> = ({
   companyAddress = 'Проспект Ленина, 46',}) => {
   const { user, logout } = useAuth();
   const [profileDialogOpen, setProfileDialogOpen] = useState(false);
+  const [newUserDialogOpen, setNewUserDialogOpen] = useState(false);
 
   const handleProfileClick = () => {
     setProfileDialogOpen(true);
@@ -122,10 +126,17 @@ export const Header: React.FC<HeaderProps> = ({
     console.log('Пользователь вышел из системы');
   };
 
+  const handleNewUser = () => {
+    setNewUserDialogOpen(true);
+  }
+  const handleNewUserClose = () => {
+    setNewUserDialogOpen(false);
+  }
+
   const displayName = user?.name || 
                     (user?.first_name && user?.last_name 
                       ? `${user.first_name} ${user.last_name}` 
-                      : user?.username || 'Пользователь');
+                      : user?.login || 'Пользователь');
 
   return (
     <>
@@ -173,6 +184,19 @@ export const Header: React.FC<HeaderProps> = ({
 
           {/* Правая часть - иконки пользователя */}
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+
+            <AdminOnly>
+              <Button 
+                variant='contained'
+                color='success'
+                fullWidth
+                sx={{ mr: 1 }}
+                onClick={handleNewUser}
+              >
+                Создать нового пользователя
+              </Button>
+            </AdminOnly>
+
             <Divider 
               orientation="vertical" 
               flexItem 
@@ -204,6 +228,12 @@ export const Header: React.FC<HeaderProps> = ({
         open={profileDialogOpen}
         onClose={handleProfileClose}
         onLogout={handleLogout}
+      />
+
+      <NewUserDialog
+        open={newUserDialogOpen}
+        onClose={handleNewUserClose}
+        
       />
     </>
   );

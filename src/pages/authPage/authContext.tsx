@@ -1,15 +1,23 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import apiClient from '../../api/axios';
+import dayjs, { Dayjs } from 'dayjs';
 
 interface User {
   id: number;
-  username: string;
-  login?: string;        // опционально, если сервер возвращает
-  name?: string;         // опционально
-  first_name?: string;   // опционально
-  last_name?: string;    // опционально
-  role_id?: number;      // опционально
-  email?: string;        // опционально
+  name: string,
+  login: string;        // опционально, если сервер возвращает
+  password: string,
+  first_name: string;   // опционально
+  last_name: string;    // опционально
+  passport_series: number,
+  passport_number: number,
+  email?: string,
+  phone_number?: string,
+  date_birth?: Dayjs | null,
+  position_id: number,
+  subdivision_id: number,
+  role_id: number;      // опционально
+  
 }
 
 interface AuthContextType {
@@ -106,7 +114,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       if (userData) {
       console.log('Login: user.id:', userData.id);
-      console.log('Login: user.username:', userData.username);
       console.log('Login: user.login:', userData.login);
       console.log('Login: user.name:', userData.name);
       console.log('Login: user.first_name:', userData.first_name);

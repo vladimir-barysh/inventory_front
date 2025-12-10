@@ -10,7 +10,6 @@ import { theme } from './theme';
 import { AuthProvider, useAuth } from '../src/pages/authPage/authContext';
 import LoginModal from '../src/pages/authPage/authPage';
 import ProtectedRoute from '../src/pages/authPage/ProtectedRoute';
-import TestApp from 'TestApp';
 
 // Компонент для основной части приложения (после авторизации)
 const MainApp = () => {
