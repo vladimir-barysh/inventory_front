@@ -2,10 +2,14 @@ import React, { createContext, useContext, useState, useEffect, useCallback } fr
 import apiClient from '../../api/axios';
 
 interface User {
-  id: string;
+  id: number;
   username: string;
-  name: string;
-  role?: string;
+  login?: string;        // опционально, если сервер возвращает
+  name?: string;         // опционально
+  first_name?: string;   // опционально
+  last_name?: string;    // опционально
+  role_id?: number;      // опционально
+  email?: string;        // опционально
 }
 
 interface AuthContextType {
@@ -99,6 +103,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (!access_token) {
         throw new Error('Токен не получен от сервера');
       }
+
+      if (userData) {
+      console.log('Login: user.id:', userData.id);
+      console.log('Login: user.username:', userData.username);
+      console.log('Login: user.login:', userData.login);
+      console.log('Login: user.name:', userData.name);
+      console.log('Login: user.first_name:', userData.first_name);
+      console.log('Login: user.last_name:', userData.last_name);
+      console.log('Login: user.role_id:', userData.role_id);
+    }
 
       setUser(userData);
       setToken(access_token);

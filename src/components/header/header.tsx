@@ -30,27 +30,22 @@ import {useAuth} from '../../pages/authPage/authContext';
 interface HeaderProps {
   companyName?: string;
   companyAddress?: string;
-  userName?: string;
-  userEmail?: string;
   onLogout?: () => void;
 }
 
 interface ProfileDialogProps {
   open: boolean;
   onClose: () => void;
-  userName: string;
-  userEmail: string;
-  companyName: string;
   onLogout: () => void;
 }
 
 const ProfileDialog: React.FC<ProfileDialogProps> = ({
   open,
   onClose,
-  userName,
-  userEmail,
   onLogout,
 }) => {
+  const { user } = useAuth();
+
   const handleLogout = () => {
     onLogout();
     onClose();
@@ -68,18 +63,20 @@ const ProfileDialog: React.FC<ProfileDialogProps> = ({
               </Avatar>
             </ListItemAvatar>
             <ListItemText 
-              primary={userName} 
-              secondary="Пользователь системы" 
+              primary={user?.name || 'Пользователь'} 
+              secondary={`Логин: ${user?.login}`}
             />
           </ListItem>
-          
-          <ListItem>
-            <Email sx={{ mr: 2, color: 'text.secondary' }} />
-            <ListItemText 
-              primary="Email" 
-              secondary={userEmail} 
-            />
-          </ListItem>
+
+          {user?.role_id && (
+            <ListItem>
+              <ListItemText 
+                primary="Роль" 
+                secondary={user.role_id === 1 ? 'Администратор' : 'Пользователь'} 
+              />
+            </ListItem>
+          )}
+
         </List>
       </DialogContent>
       <DialogActions sx={{ px: 3, pb: 3 }}>
@@ -107,13 +104,8 @@ const ProfileDialog: React.FC<ProfileDialogProps> = ({
 
 export const Header: React.FC<HeaderProps> = ({ 
   companyName = 'ООО «Склад»',
-  companyAddress = 'Проспект Ленина, 46',
-  userName = 'Иванов И.И.',
-  userEmail = 'ivanov@example.com',
-  onLogout = () => {
-    console.log('Выход из аккаунта');
-  }
-}) => {
+  companyAddress = 'Проспект Ленина, 46',}) => {
+  const { user, logout } = useAuth();
   const [profileDialogOpen, setProfileDialogOpen] = useState(false);
 
   const handleProfileClick = () => {
@@ -123,6 +115,17 @@ export const Header: React.FC<HeaderProps> = ({
   const handleProfileClose = () => {
     setProfileDialogOpen(false);
   };
+
+  const handleLogout = () => {
+    logout(); // Вызываем logout из контекста
+    // Можно добавить дополнительную логику, если нужно
+    console.log('Пользователь вышел из системы');
+  };
+
+  const displayName = user?.name || 
+                    (user?.first_name && user?.last_name 
+                      ? `${user.first_name} ${user.last_name}` 
+                      : user?.username || 'Пользователь');
 
   return (
     <>
@@ -191,7 +194,7 @@ export const Header: React.FC<HeaderProps> = ({
             </IconButton>
             
             <Typography variant="body2" sx={{ ml: 1, fontSize: '0.9rem' }}>
-              {userName}
+              {displayName}
             </Typography>
           </Box>
         </Toolbar>
@@ -200,10 +203,7 @@ export const Header: React.FC<HeaderProps> = ({
       <ProfileDialog
         open={profileDialogOpen}
         onClose={handleProfileClose}
-        userName={userName}
-        userEmail={userEmail}
-        companyName={companyName}
-        onLogout={onLogout}
+        onLogout={handleLogout}
       />
     </>
   );
