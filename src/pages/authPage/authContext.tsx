@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import apiClient from 'C:/Users/megab/Рабочий стол/inventory/inventory_front/src/api/axios';
 
 interface User {
@@ -23,64 +23,100 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [token, setToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    // Проверяем сохраненную сессию при загрузке
-    const savedToken = localStorage.getItem('token') || sessionStorage.getItem('token');
-    if (savedToken) {
-      validateToken(savedToken);
-    } else {
-      setLoading(false);
-    }
-  }, []);
-
-  const validateToken = async (token: string) => {
+  const validateToken = useCallback(async (tokenToValidate: string) => {
     try {
+      console.log('Валидация токена...');
+      
+      // Вариант 1: Токен в заголовках (рекомендуется)
       const response = await apiClient.get('/auth/validate', {
-        headers: { 'Authorization': `Bearer ${token}` }
+        headers: { 'Authorization': `Bearer ${tokenToValidate}` }
       });
-      if (response.data) {
-        setUser(response.data);
-        setToken(token);
-      } else {
-        clearAuth();
-      }
+      
+      console.log('Токен валиден, пользователь:', response.data);
+      
+      setUser(response.data);
+      setToken(tokenToValidate);
+      
+      // Устанавливаем токен для всех будущих запросов
+      apiClient.defaults.headers.common['Authorization'] = `Bearer ${tokenToValidate}`;
+      return true;
     } catch (error) {
       console.error('Ошибка валидации токена:', error);
       clearAuth();
-    } finally {
-      setLoading(false);
+      return false;
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    const checkStoredAuth = async () => {
+      try {
+        console.log('Проверка сохраненной авторизации...');
+        
+        // Ищем токен в разных хранилищах
+        const savedToken = localStorage.getItem('token') || sessionStorage.getItem('token');
+        console.log('Найден токен:', !!savedToken);
+        
+        if (savedToken) {
+          const isValid = await validateToken(savedToken);
+          if (!isValid) {
+            console.log('Токен невалиден, очищаем...');
+            clearAuth();
+          }
+        } else {
+          console.log('Токен не найден');
+        }
+      } catch (error) {
+        console.error('Ошибка при проверке авторизации:', error);
+        clearAuth();
+      } finally {
+        setLoading(false);
+        console.log('Проверка завершена, loading:', false);
+      }
+    };
+
+    checkStoredAuth();
+  }, [validateToken]);
 
   const clearAuth = () => {
     setUser(null);
     setToken(null);
     localStorage.removeItem('token');
+    localStorage.removeItem('user');
     sessionStorage.removeItem('token');
+    sessionStorage.removeItem('user');
     delete apiClient.defaults.headers.common['Authorization'];
   };
 
   const login = async (login: string, password: string, remember: boolean) => {
     try {
       const response = await apiClient.post('/auth/login', {
-        login,
-        password
+        login: login,
+        password: password
       });
 
-      const { user: userData, token: authToken } = response.data;
+      const { user: userData, access_token } = response.data;
+
+      if (!access_token) {
+        throw new Error('Токен не получен от сервера');
+      }
 
       setUser(userData);
-      setToken(authToken);
+      setToken(access_token);
+
       
       // Сохраняем токен
       if (remember) {
-        localStorage.setItem('token', authToken);
+        console.log('Сохраняем в localStorage');
+        localStorage.setItem('token', access_token);
+        localStorage.setItem('user', JSON.stringify(userData));
       } else {
-        sessionStorage.setItem('token', authToken);
+        console.log('Сохраняем в sessionStorage');
+        sessionStorage.setItem('token', access_token);
+        sessionStorage.setItem('user', JSON.stringify(userData));
       }
       
       // Сохраняем токен в axios для последующих запросов
-      apiClient.defaults.headers.common['Authorization'] = `Bearer ${authToken}`;
+      apiClient.defaults.headers.common['Authorization'] = `Bearer ${access_token}`;
 
     } catch (error: any) {
       const errorMessage = error.response?.data?.detail || 
