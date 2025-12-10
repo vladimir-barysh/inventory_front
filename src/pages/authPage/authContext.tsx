@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import apiClient from 'C:/Users/megab/Рабочий стол/inventory/inventory_front/src/api/axios';
+import apiClient from '../../api/axios';
 
 interface User {
   id: string;

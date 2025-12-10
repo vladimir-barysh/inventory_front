@@ -25,6 +25,8 @@ import {
   Email,
 } from '@mui/icons-material';
 
+import {useAuth} from '../../pages/authPage/authContext';
+
 interface HeaderProps {
   companyName?: string;
   companyAddress?: string;
