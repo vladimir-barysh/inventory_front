@@ -5,8 +5,10 @@ import CssBaseline from '@mui/material/CssBaseline';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import { Header, Sidebar } from './components';
-import { DocumentsPage, SuppliersPage, StoragePage, EmployeesPage, ProductsPage } from './pages';
+import { DocumentsPage, SuppliersPage, EmployeesPage, ProductsPage } from './pages';
 import { theme } from './theme'; // Импорт темы
+
+import StoragePage from 'pages/storagePage/storagePage';
 
 function App() {
   return (

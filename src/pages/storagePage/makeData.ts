@@ -1,58 +1,257 @@
-// src/pages/storage/makeData.ts
+const API_BASE = "http://localhost:8000";
+
+// Типы условий хранения
+export interface StorageCondition {
+  id: number;
+  name: string;
+}
+
 export interface StorageZone {
   id: number;
-  наименование: string;
-  условияХранения: 'сухое' | 'холодильное' | 'морозильное' | 'вентилируемое' | 'специальное';
-  комментарий: string;
+  наименование: string;          // name с бэка
+  условияХранения: string;       // storage_condition с бэка (строка)
+  комментарий: string;           // comment с бэка
 }
 
-export const storageZonesData: StorageZone[] = [
-  { id: 1, наименование: 'Зона А-1', условияХранения: 'сухое', комментарий: 'Основное хранение товаров общего назначения'},
-  { id: 2, наименование: 'Холодильная камера №1', условияХранения: 'холодильное', комментарий: 'Температура: +2°C до +8°C'},
-  { id: 3, наименование: 'Морозильная камера', условияХранения: 'морозильное', комментарий: 'Температура: -18°C'},
-  { id: 4, наименование: 'Зона Б-2', условияХранения: 'вентилируемое', комментарий: 'Для товаров, требующих вентиляции'},
-  { id: 5, наименование: 'Спец. зона хим. продукции', условияХранения: 'специальное', комментарий: 'Изолированная зона для химических товаров'},
-  { id: 6, наименование: 'Зона В-3', условияХранения: 'сухое', комментарий: 'Резервное хранение'},
-  { id: 7, наименование: 'Холодильная камера №2', условияХранения: 'холодильное', комментарий: 'На обслуживании'},
-];
-
-// Типы для формы
 export interface StorageZoneFormData {
   наименование: string;
-  условияХранения: 'сухое' | 'холодильное' | 'морозильное' | 'вентилируемое' | 'специальное';
+  условияХранения: string;
   комментарий: string;
 }
 
-// Конфигурация для условий хранения
-export const storageConditionsConfig = {
-  'сухое': { 
-    label: 'Сухое хранение', 
-    icon: '🏭', 
-    description: 'Нормальная влажность, комнатная температура',
-    color: '#e8f5e9'
-  },
-  'холодильное': { 
-    label: 'Холодильное', 
-    icon: '❄️', 
-    description: 'Температура от +2°C до +8°C',
-    color: '#e3f2fd'
-  },
-  'морозильное': { 
-    label: 'Морозильное', 
-    icon: '🧊', 
-    description: 'Температура ниже -18°C',
-    color: '#e1f5fe'
-  },
-  'вентилируемое': { 
-    label: 'Вентилируемое', 
-    icon: '💨', 
-    description: 'Постоянная циркуляция воздуха',
-    color: '#f3e5f5'
-  },
-  'специальное': { 
-    label: 'Специальное', 
-    icon: '⚠️', 
-    description: 'Особые условия хранения',
-    color: '#fff3e0'
-  },
+// Глобальный кэш для синхронизации
+let storageConditionsCache: StorageCondition[] = [];
+let conditionNameToIdMap: Record<string, number> = {};
+
+// API функции
+export const getStorageConditions = async (): Promise<StorageCondition[]> => {
+  try {
+    const res = await fetch(`${API_BASE}/storageconditions/`);
+    if (!res.ok) throw new Error(`Ошибка загрузки условий хранения: ${res.status}`);
+    const data = await res.json();
+    
+    // Обновляем кэш
+    storageConditionsCache = data;
+    conditionNameToIdMap = {};
+    data.forEach((condition: StorageCondition) => {
+      conditionNameToIdMap[condition.name] = condition.id;
+    });
+    
+    return data;
+  } catch (error) {
+    console.error("Ошибка в getStorageConditions:", error);
+    throw error;
+  }
+};
+
+export const getStorageZones = async (): Promise<StorageZone[]> => {
+  try {
+    // Сначала загружаем условия хранения, если еще не загружены
+    if (storageConditionsCache.length === 0) {
+      await getStorageConditions();
+    }
+
+    const resZones = await fetch(`${API_BASE}/storagezones/`);
+    if (!resZones.ok) throw new Error(`Ошибка загрузки зон хранения: ${resZones.status}`);
+    const zonesData = await resZones.json();
+
+    const zones = zonesData.map((z: any) => {
+      // Находим имя условия хранения
+      let conditionName = 'Не указано';
+      
+      // Проверяем разные возможные поля
+      if (z.storage_condition_name) {
+        conditionName = z.storage_condition_name;
+      } else if (z.storage_condition) {
+        conditionName = z.storage_condition;
+      } else if (z.storage_condition_id && storageConditionsCache.length > 0) {
+        const condition = storageConditionsCache.find(c => c.id === z.storage_condition_id);
+        conditionName = condition?.name || 'Неизвестно';
+      }
+
+      return {
+        id: z.id,
+        наименование: z.name || '',
+        условияХранения: conditionName,
+        комментарий: z.comment || '',
+      };
+    });
+
+    return zones;
+  } catch (error) {
+    console.error("Ошибка в getStorageZones:", error);
+    throw error;
+  }
+};
+
+export const postStorageZone = async (data: StorageZoneFormData) => {
+  try {
+    // Убеждаемся, что условия загружены
+    if (storageConditionsCache.length === 0) {
+      await getStorageConditions();
+    }
+
+    // Получаем ID условия хранения
+    const conditionId = conditionNameToIdMap[data.условияХранения];
+    
+    if (!conditionId) {
+      throw new Error(`Условие хранения "${data.условияХранения}" не найдено. Доступные: ${Object.keys(conditionNameToIdMap).join(', ')}`);
+    }
+
+    const body = {
+      name: data.наименование.trim(),
+      storage_condition_id: conditionId,
+      comment: data.комментарий.trim(),
+    };
+
+
+    const res = await fetch(`${API_BASE}/storagezones/`, {
+      method: "POST",
+      headers: { 
+        "Content-Type": "application/json",
+        "Accept": "application/json"
+      },
+      body: JSON.stringify(body),
+    });
+
+    const responseText = await res.text();
+
+    if (!res.ok) {
+      throw new Error(`Ошибка создания зоны (${res.status}): ${responseText}`);
+    }
+
+    return JSON.parse(responseText || '{}');
+  } catch (error) {
+    console.error("Ошибка в postStorageZone:", error);
+    throw error;
+  }
+};
+
+export const putStorageZone = async (id: number, data: StorageZoneFormData) => {
+  try {
+    // Убеждаемся, что условия загружены
+    if (storageConditionsCache.length === 0) {
+      await getStorageConditions();
+    }
+
+    // Получаем ID условия хранения
+    const conditionId = conditionNameToIdMap[data.условияХранения];
+    
+    if (!conditionId) {
+      throw new Error(`Условие хранения "${data.условияХранения}" не найдено. Доступные: ${Object.keys(conditionNameToIdMap).join(', ')}`);
+    }
+
+    const body = {
+      name: data.наименование.trim(),
+      storage_condition_id: conditionId,
+      comment: data.комментарий.trim(),
+    };
+
+
+    // Сначала пробуем PUT
+    const res = await fetch(`${API_BASE}/storagezones/${id}`, {
+      method: "PUT",
+      headers: { 
+        "Content-Type": "application/json",
+        "Accept": "application/json"
+      },
+      body: JSON.stringify(body),
+    });
+
+    const responseText = await res.text();
+
+    if (!res.ok) {
+      if (res.status === 405) {
+        const resPatch = await fetch(`${API_BASE}/storagezones/${id}`, {
+          method: "PATCH",
+          headers: { 
+            "Content-Type": "application/json",
+            "Accept": "application/json"
+          },
+          body: JSON.stringify(body),
+        });
+
+        const patchText = await resPatch.text();
+
+        if (!resPatch.ok) {
+          throw new Error(`Ошибка обновления зоны PATCH (${resPatch.status}): ${patchText}`);
+        }
+
+        return JSON.parse(patchText || '{}');
+      }
+      
+      throw new Error(`Ошибка обновления зоны (${res.status}): ${responseText}`);
+    }
+
+    return JSON.parse(responseText || '{}');
+  } catch (error) {
+    console.error("Ошибка в putStorageZone:", error);
+    throw error;
+  }
+};
+
+export const deleteStorageZoneById = async (id: number) => {
+  try {
+    console.log(`Попытка удаления зоны с ID: ${id}`);
+
+    const res = await fetch(`${API_BASE}/storagezones/${id}`, { 
+      method: "DELETE",
+      headers: { 
+        "Accept": "application/json"
+      }
+    });
+
+    const responseText = await res.text();
+    console.log("Ответ от сервера (удаление):", res.status, responseText);
+
+    if (!res.ok) {
+      throw new Error(`Ошибка удаления зоны (${res.status}): ${responseText}`);
+    }
+
+    // Если статус 204 (No Content), возвращаем успех
+    if (res.status === 204) {
+      return { success: true, message: "Зона успешно удалена" };
+    }
+
+    // Если есть тело ответа, парсим его
+    if (responseText) {
+      return JSON.parse(responseText);
+    }
+
+    return { success: true };
+  } catch (error) {
+    console.error("Ошибка в deleteStorageZoneById:", error);
+    throw error;
+  }
+};
+
+// Конфиг для UI
+export let storageConditionsConfig: Record<string, { 
+  label: string; 
+  icon: string; 
+  description: string; 
+  color: string;
+}> = {};
+
+// Функция для инициализации storageConditionsConfig
+export const initStorageConditionsConfig = (conditions: StorageCondition[]) => {
+  const colors = ['#e8f5e9', '#e3f2fd', '#e1f5fe', '#f3e5f5', '#fff3e0'];
+  const icons = ['🏭', '🌡️', '💦', '💨', '⚠️'];
+
+  storageConditionsConfig = {};
+  conditions.forEach((c, index) => {
+    storageConditionsConfig[c.name] = {
+      label: c.name,
+      icon: icons[index % icons.length],
+      description: c.name,
+      color: colors[index % colors.length],
+    };
+  });
+
+  console.log("Инициализирован конфиг условий:", storageConditionsConfig);
+};
+
+// Функция для получения условий из кэша
+export const getCachedConditions = (): StorageCondition[] => {
+  return [...storageConditionsCache];
 };
