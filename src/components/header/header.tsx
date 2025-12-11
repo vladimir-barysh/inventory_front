@@ -190,7 +190,7 @@ export const Header: React.FC<HeaderProps> = ({
                 variant='contained'
                 color='success'
                 fullWidth
-                sx={{ mr: 1 }}
+                sx={{ mr: 1, display: 'none' }}
                 onClick={handleNewUser}
               >
                 Создать нового пользователя

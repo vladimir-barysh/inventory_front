@@ -50,6 +50,9 @@ import {
   departmentConfig,
 } from './makeData';
 
+
+import AdminOnly from '../../components/AdminOnly';
+
 // Компонент для отображения роли
 const RoleChip: React.FC<{ role: Employee['роль'] }> = ({ role }) => {
   const config = roleConfig[role];
@@ -444,18 +447,20 @@ export const EmployeesPage: React.FC = () => {
             </Box>
             
             {/* Кнопка добавления */}
-            <Button
-              variant="contained"
-              startIcon={<Add />}
-              onClick={handleAddEmployee}
-              sx={{ 
-                backgroundColor: '#1976d2',
-                minWidth: 170,
-                alignSelf: { xs: 'stretch', md: 'center' }
-              }}
-            >
-              Добавить
-            </Button>
+            <AdminOnly>
+              <Button
+                variant="contained"
+                startIcon={<Add />}
+                onClick={handleAddEmployee}
+                sx={{ 
+                  backgroundColor: '#1976d2',
+                  minWidth: 170,
+                  alignSelf: { xs: 'stretch', md: 'center' }
+                }}
+              >
+                Добавить
+              </Button>
+            </AdminOnly>
           </Box>
         </Paper>
       </Box>

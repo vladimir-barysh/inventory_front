@@ -47,6 +47,8 @@ import {
   deleteCompanyById 
 } from './makeData';
 
+import AdminOnly from '../../components/AdminOnly';
+
 // Конфигурация для типов компаний
 const typeConfig: Record<string, { icon: string; label: string; bgColor: string; color: string }> = {
   'ООО': { icon: '🏢', label: 'ООО', bgColor: '#e3f2fd', color: '#1565c0' },
@@ -433,18 +435,20 @@ export const SuppliersPage: React.FC = () => {
             </Box>
             
             {/* Кнопка добавления */}
-            <Button
-              variant="contained"
-              startIcon={<Add />}
-              onClick={handleAddCompany}
-              sx={{ 
-                backgroundColor: '#1976d2',
-                minWidth: 170,
-                alignSelf: { xs: 'stretch', md: 'center' }
-              }}
-            >
-              Добавить
-            </Button>
+            <AdminOnly>
+              <Button
+                variant="contained"
+                startIcon={<Add />}
+                onClick={handleAddCompany}
+                sx={{ 
+                  backgroundColor: '#1976d2',
+                  minWidth: 170,
+                  alignSelf: { xs: 'stretch', md: 'center' }
+                }}
+              >
+                Добавить
+              </Button>
+            </AdminOnly>
           </Box>
         </Paper>
       </Box>

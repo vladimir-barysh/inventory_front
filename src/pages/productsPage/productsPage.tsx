@@ -45,6 +45,9 @@ import {
 import { SecondSidebar } from './../../components';
 import { Product, productsData, ProductFormData, suppliers } from './makeData';
 
+import AdminOnly from '../../components/AdminOnly';
+
+
 // Типы для категорий товаров
 interface CategoryItem {
   text: string;
@@ -477,18 +480,20 @@ export const ProductsPage: React.FC = () => {
               </Box>
 
               {/* Кнопка добавления */}
-              <Button
-                variant="contained"
-                startIcon={<Add />}
-                onClick={handleAddProduct}
-                sx={{
-                  backgroundColor: '#1976d2',
-                  minWidth: 170,
-                  alignSelf: { xs: 'stretch', md: 'center' }
-                }}
-              >
-                Добавить товар
-              </Button>
+              <AdminOnly>
+                <Button
+                  variant="contained"
+                  startIcon={<Add />}
+                  onClick={handleAddProduct}
+                  sx={{
+                    backgroundColor: '#1976d2',
+                    minWidth: 170,
+                    alignSelf: { xs: 'stretch', md: 'center' }
+                  }}
+                >
+                  Добавить товар
+                </Button>
+              </AdminOnly>
             </Box>
           </Paper>
         </Box>

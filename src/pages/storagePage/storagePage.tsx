@@ -55,6 +55,8 @@ import {
   deleteStorageZoneById,
 } from './makeData';
 
+import AdminOnly from '../../components/AdminOnly';
+
 // Компонент для отображения условий хранения
 const StorageConditionChip: React.FC<{ condition: StorageZone['условияХранения'] }> = ({ condition }) => {
   const config = storageConditionsConfig[condition] || {
@@ -485,18 +487,20 @@ export const StoragePage: React.FC = () => {
               >
                 Обновить
               </Button>
-              <Button
-                variant="contained"
-                startIcon={<Add />}
-                onClick={handleAddZone}
-                disabled={loading}
-                sx={{ 
-                  backgroundColor: '#1976d2',
-                  minWidth: 170,
-                }}
-              >
-                Добавить зону
-              </Button>
+              <AdminOnly>
+                <Button
+                  variant="contained"
+                  startIcon={<Add />}
+                  onClick={handleAddZone}
+                  disabled={loading}
+                  sx={{ 
+                    backgroundColor: '#1976d2',
+                    minWidth: 170,
+                  }}
+                >
+                  Добавить зону
+                </Button>
+              </AdminOnly>
             </Box>
           </Box>
         </Paper>
