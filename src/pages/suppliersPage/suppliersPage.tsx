@@ -27,6 +27,7 @@ import {
   ListItemIcon,
   ListItemText,
   Alert,
+  Snackbar,
 } from '@mui/material';
 import {
   Search,
@@ -35,12 +36,16 @@ import {
   Delete,
   MoreVert,
   Business,
-  Person,
-  Phone,
-  Email,
-  LocationOn,
 } from '@mui/icons-material';
-import { Company, CompanyType, getCompanies, getCompanyTypes, postCompany, putCompany, deleteCompanyById } from './makeData';
+import { 
+  Company, 
+  CompanyType, 
+  getCompanies, 
+  getCompanyTypes, 
+  postCompany, 
+  putCompany, 
+  deleteCompanyById 
+} from './makeData';
 
 // Конфигурация для типов компаний
 const typeConfig: Record<string, { icon: string; label: string; bgColor: string; color: string }> = {
@@ -84,10 +89,11 @@ const TypeChip: React.FC<{ typeName: string | null }> = ({ typeName }) => {
 interface CompanyDialogProps {
   open: boolean;
   onClose: () => void;
-  onSubmit: (data: { name: string; company_type_id: number }) => void;
+  onSubmit: (data: { name: string; company_type_id: number }) => Promise<void>;
   initialData?: { name: string; company_type_id: number };
   companyTypes: CompanyType[];
   isEdit?: boolean;
+  loading?: boolean;
 }
 
 const CompanyDialog: React.FC<CompanyDialogProps> = ({ 
@@ -96,26 +102,34 @@ const CompanyDialog: React.FC<CompanyDialogProps> = ({
   onSubmit, 
   initialData, 
   companyTypes, 
-  isEdit = false 
+  isEdit = false,
+  loading = false
 }) => {
   const [formData, setFormData] = useState<{ name: string; company_type_id: number }>({
-    name: initialData?.name || '',
-    company_type_id: initialData?.company_type_id || (companyTypes[0]?.id ?? 0),
+    name: '',
+    company_type_id: 0,
   });
 
   useEffect(() => {
     if (initialData) {
       setFormData(initialData);
+    } else {
+      setFormData({
+        name: '',
+        company_type_id: companyTypes[0]?.id || 0
+      });
     }
-  }, [initialData]);
+  }, [initialData, companyTypes]);
 
   const handleChange = (field: 'name' | 'company_type_id', value: string | number) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
-  const handleSubmit = () => {
-    onSubmit(formData);
-    onClose();
+  const handleSubmit = async () => {
+    if (!formData.name.trim() || !formData.company_type_id) {
+      return;
+    }
+    await onSubmit(formData);
   };
 
   return (
@@ -125,12 +139,13 @@ const CompanyDialog: React.FC<CompanyDialogProps> = ({
       </DialogTitle>
       <DialogContent>
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 2 }}>
-          <FormControl fullWidth>
+          <FormControl fullWidth required>
             <InputLabel>Тип организации</InputLabel>
             <Select
-              value={formData.company_type_id}
+              value={formData.company_type_id || ''}
               label="Тип организации"
               onChange={(e) => handleChange('company_type_id', Number(e.target.value))}
+              disabled={loading}
             >
               {companyTypes.map((type) => {
                 const config = typeConfig[type.name] || { icon: '🏢', label: type.name };
@@ -151,6 +166,8 @@ const CompanyDialog: React.FC<CompanyDialogProps> = ({
             value={formData.name}
             onChange={(e) => handleChange('name', e.target.value)}
             fullWidth
+            required
+            disabled={loading}
             InputProps={{
               startAdornment: (
                 <InputAdornment position="start">
@@ -162,9 +179,14 @@ const CompanyDialog: React.FC<CompanyDialogProps> = ({
         </Box>
       </DialogContent>
       <DialogActions>
-        <Button onClick={onClose}>Отмена</Button>
-        <Button onClick={handleSubmit} variant="contained" color="primary">
-          {isEdit ? 'Сохранить' : 'Добавить'}
+        <Button onClick={onClose} disabled={loading}>Отмена</Button>
+        <Button 
+          onClick={handleSubmit} 
+          variant="contained" 
+          color="primary"
+          disabled={loading || !formData.name.trim() || !formData.company_type_id}
+        >
+          {loading ? 'Сохранение...' : (isEdit ? 'Сохранить' : 'Добавить')}
         </Button>
       </DialogActions>
     </Dialog>
@@ -183,6 +205,16 @@ export const SuppliersPage: React.FC = () => {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
+  const [dialogLoading, setDialogLoading] = useState(false);
+  const [snackbar, setSnackbar] = useState<{
+    open: boolean;
+    message: string;
+    severity: 'success' | 'error';
+  }>({
+    open: false,
+    message: '',
+    severity: 'success'
+  });
 
   // Загрузка данных
   useEffect(() => {
@@ -197,6 +229,7 @@ export const SuppliersPage: React.FC = () => {
         setCompanies(comps);
       } catch (err) {
         console.error('Ошибка загрузки данных:', err);
+        showSnackbar('Ошибка загрузки данных', 'error');
       } finally {
         setLoading(false);
       }
@@ -226,10 +259,10 @@ export const SuppliersPage: React.FC = () => {
 
   const handleMenuClose = () => {
     setAnchorEl(null);
-    setSelectedCompany(null);
   };
 
   const handleAddCompany = () => {
+    setSelectedCompany(null);
     setIsEditing(false);
     setDialogOpen(true);
   };
@@ -250,8 +283,10 @@ export const SuppliersPage: React.FC = () => {
       try {
         await deleteCompanyById(selectedCompany.id);
         setCompanies(prev => prev.filter(c => c.id !== selectedCompany.id));
+        showSnackbar('Компания успешно удалена', 'success');
       } catch (err) {
         console.error('Ошибка удаления компании:', err);
+        showSnackbar('Ошибка удаления компании', 'error');
       }
     }
     setDeleteDialogOpen(false);
@@ -259,19 +294,64 @@ export const SuppliersPage: React.FC = () => {
   };
 
   const handleDialogSubmit = async (data: { name: string; company_type_id: number }) => {
-    try {
-      if (isEditing && selectedCompany) {
-        const updated = await putCompany(selectedCompany.id, data);
-        setCompanies(prev => prev.map(c => 
-          c.id === updated.id ? updated : c
-        ));
-      } else {
-        const created = await postCompany(data);
-        setCompanies(prev => [...prev, created]);
-      }
-    } catch (err) {
-      console.error('Ошибка сохранения компании:', err);
+  try {
+    setDialogLoading(true);
+    
+    if (isEditing && selectedCompany) {
+      // Редактирование существующей компании
+      const updated = await putCompany(selectedCompany.id, data);
+      
+      // ИСПРАВЛЕНИЕ: Находим название типа компании по ID
+      const companyTypeName = companyTypes.find(t => t.id === data.company_type_id)?.name || null;
+      
+      // Обновляем данные компании в состоянии
+      setCompanies(prev => prev.map(c => {
+        if (c.id === updated.id) {
+          return {
+            ...updated,
+            company_type: companyTypeName, // Добавляем название типа
+          };
+        }
+        return c;
+      }));
+      
+      showSnackbar('Компания успешно обновлена', 'success');
+    } else {
+      // Создание новой компании
+      const created = await postCompany(data);
+      
+      // ИСПРАВЛЕНИЕ: Находим название типа компании по ID
+      const companyTypeName = companyTypes.find(t => t.id === data.company_type_id)?.name || null;
+      
+      const companyWithType = {
+        ...created,
+        company_type: companyTypeName, // Добавляем название типа
+      };
+      
+      setCompanies(prev => [...prev, companyWithType]);
+      showSnackbar('Компания успешно добавлена', 'success');
     }
+    
+    setDialogOpen(false);
+    setSelectedCompany(null);
+  } catch (err) {
+    console.error('Ошибка сохранения компании:', err);
+    showSnackbar('Ошибка сохранения компании', 'error');
+  } finally {
+    setDialogLoading(false);
+  }
+};
+
+  const showSnackbar = (message: string, severity: 'success' | 'error') => {
+    setSnackbar({
+      open: true,
+      message,
+      severity
+    });
+  };
+
+  const handleCloseSnackbar = () => {
+    setSnackbar(prev => ({ ...prev, open: false }));
   };
 
   // Подсчет компаний по типам
@@ -507,7 +587,10 @@ export const SuppliersPage: React.FC = () => {
       {/* Диалог добавления/редактирования */}
       <CompanyDialog
         open={dialogOpen}
-        onClose={() => setDialogOpen(false)}
+        onClose={() => {
+          setDialogOpen(false);
+          setSelectedCompany(null);
+        }}
         onSubmit={handleDialogSubmit}
         initialData={selectedCompany ? { 
           name: selectedCompany.name, 
@@ -515,6 +598,7 @@ export const SuppliersPage: React.FC = () => {
         } : undefined}
         companyTypes={companyTypes}
         isEdit={isEditing}
+        loading={dialogLoading}
       />
 
       {/* Диалог подтверждения удаления */}
@@ -540,6 +624,22 @@ export const SuppliersPage: React.FC = () => {
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* Уведомления */}
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={3000}
+        onClose={handleCloseSnackbar}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert 
+          onClose={handleCloseSnackbar} 
+          severity={snackbar.severity}
+          variant="filled"
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 };
