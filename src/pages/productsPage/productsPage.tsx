@@ -511,7 +511,9 @@ export const ProductsPage: React.FC = () => {
                   <TableCell>Цена продажи</TableCell>
                   <TableCell>Поставщик</TableCell>
                   <TableCell>Количество</TableCell>
-                  <TableCell align="right">Действия</TableCell>
+                  <AdminOnly>
+                    <TableCell align="right">Действия</TableCell>
+                  </AdminOnly>
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -570,14 +572,16 @@ export const ProductsPage: React.FC = () => {
                           </Typography>
                         </Box>
                       </TableCell>
-                      <TableCell align="right">
-                        <IconButton
-                          size="small"
-                          onClick={(e) => handleMenuOpen(e, product)}
-                        >
-                          <MoreVert />
-                        </IconButton>
-                      </TableCell>
+                      <AdminOnly>
+                        <TableCell align="right">
+                          <IconButton
+                            size="small"
+                            onClick={(e) => handleMenuOpen(e, product)}
+                          >
+                            <MoreVert />
+                          </IconButton>
+                        </TableCell>
+                      </AdminOnly>
                     </TableRow>
                   ))}
               </TableBody>

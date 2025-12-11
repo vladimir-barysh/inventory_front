@@ -477,7 +477,9 @@ export const EmployeesPage: React.FC = () => {
                 <TableCell>Подразделение</TableCell>
                 <TableCell>Контакты</TableCell>
                 <TableCell>Паспорт</TableCell>
-                <TableCell align="right">Действия</TableCell>
+                <AdminOnly>
+                  <TableCell align="right">Действия</TableCell>
+                </AdminOnly>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -525,14 +527,16 @@ export const EmployeesPage: React.FC = () => {
                         {employee.серияПаспорта} {employee.номерПаспорта}
                       </Typography>
                     </TableCell>
-                    <TableCell align="right">
-                      <IconButton
-                        size="small"
-                        onClick={(e) => handleMenuOpen(e, employee)}
-                      >
-                        <MoreVert />
-                      </IconButton>
-                    </TableCell>
+                    <AdminOnly>
+                      <TableCell align="right">
+                        <IconButton
+                          size="small"
+                          onClick={(e) => handleMenuOpen(e, employee)}
+                        >
+                          <MoreVert />
+                        </IconButton>
+                      </TableCell>
+                      </AdminOnly>
                   </TableRow>
                 ))}
             </TableBody>

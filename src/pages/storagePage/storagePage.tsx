@@ -521,7 +521,9 @@ export const StoragePage: React.FC = () => {
                     <TableCell>Наименование</TableCell>
                     <TableCell>Условия хранения</TableCell>
                     <TableCell>Комментарий</TableCell>
-                    <TableCell align="right">Действия</TableCell>
+                    <AdminOnly>
+                      <TableCell align="right">Действия</TableCell>
+                    </AdminOnly>
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -565,15 +567,17 @@ export const StoragePage: React.FC = () => {
                               {zone.комментарий || 'Нет комментария'}
                             </Typography>
                           </TableCell>
-                          <TableCell align="right">
-                            <IconButton
-                              size="small"
-                              onClick={(e) => handleMenuOpen(e, zone)}
-                              disabled={loading}
-                            >
-                              <MoreVert />
-                            </IconButton>
-                          </TableCell>
+                          <AdminOnly>
+                            <TableCell align="right">
+                              <IconButton
+                                size="small"
+                                onClick={(e) => handleMenuOpen(e, zone)}
+                                disabled={loading}
+                              >
+                                <MoreVert />
+                              </IconButton>
+                            </TableCell>
+                          </AdminOnly>
                         </TableRow>
                       ))
                   )}

@@ -461,7 +461,9 @@ export const SuppliersPage: React.FC = () => {
               <TableRow>
                 <TableCell>Тип</TableCell>
                 <TableCell>Наименование</TableCell>
-                <TableCell align="right">Действия</TableCell>
+                <AdminOnly>  
+                  <TableCell align="right">Действия</TableCell>
+                </AdminOnly>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -494,14 +496,16 @@ export const SuppliersPage: React.FC = () => {
                           {company.name}
                         </Typography>
                       </TableCell>
-                      <TableCell align="right">
-                        <IconButton
-                          size="small"
-                          onClick={(e) => handleMenuOpen(e, company)}
-                        >
-                          <MoreVert />
-                        </IconButton>
-                      </TableCell>
+                      <AdminOnly>
+                        <TableCell align="right">
+                          <IconButton
+                            size="small"
+                            onClick={(e) => handleMenuOpen(e, company)}
+                          >
+                            <MoreVert />
+                          </IconButton>
+                        </TableCell>
+                      </AdminOnly>
                     </TableRow>
                   ))
               )}
