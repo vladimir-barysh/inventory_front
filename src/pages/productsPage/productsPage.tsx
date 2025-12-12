@@ -1,49 +1,30 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
-  Box,
-  Typography,
-  Paper,
-  TextField,
-  InputAdornment,
-  Button,
-  IconButton,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  TablePagination,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
-  Menu,
-  ListItemIcon,
-  ListItemText,
-  Alert,
+  Box, Typography,
+  Paper, TextField,
+  InputAdornment, Button,
+  IconButton, Table,
+  TableBody, TableCell,
+  TableContainer, TableHead,
+  TableRow, TablePagination,
+  Dialog, DialogTitle,
+  DialogContent, DialogActions,
+  FormControl, InputLabel,
+  Select, MenuItem,
+  Menu, ListItemIcon,
+  ListItemText, Alert,
   Chip,
 } from '@mui/material';
 import {
-  Search,
-  Add,
-  Edit,
-  Delete,
-  MoreVert,
-  Category,
-  Inventory,
-  AttachMoney,
-  ShoppingCart,
-  Store,
-  Numbers,
-  Tag,
+  Search, Add,
+  Edit, Delete,
+  MoreVert, Category as CategoryIcon,
+  Inventory, AttachMoney,
+  ShoppingCart, Store,
+  Numbers, Tag,
 } from '@mui/icons-material';
 import { SecondSidebar } from './../../components';
-import { Product, productsData, ProductFormData, suppliers } from './makeData';
+import { Product, productsData, ProductFormData, suppliers, categoryApi, Category } from './makeData';
 
 import AdminOnly from '../../components/AdminOnly';
 
@@ -149,7 +130,7 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
             InputProps={{
                 startAdornment: (
                 <InputAdornment position="start">
-                    <Category fontSize="small" />
+                    <CategoryIcon fontSize="small" />
                 </InputAdornment>
                 ),
             }}
@@ -267,6 +248,10 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
 
 export const ProductsPage: React.FC = () => {
   const [products, setProducts] = useState<Product[]>(productsData);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [loading, setLoading] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
+
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
@@ -277,42 +262,35 @@ export const ProductsPage: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
 
-  // Категории для сайдбара
+  useEffect(() => {
+    loadCategories();
+  });
+
+   // Функция загрузки категорий через API
+  const loadCategories = async () => {
+    setLoading(true);
+    setError(null);
+    
+    try {
+      const data = await categoryApi.getAll();
+      setCategories(data);
+      console.log('Категории загружены:', data);
+    } catch (err) {
+      console.error('Ошибка загрузки категорий:', err);
+      setError('Не удалось загрузить категории');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const categorySections: CategorySection[] = [
     {
       title: 'Категории товаров',
-      items: [
-        {
-          text: 'Электроника',
-          icon: <Category />,
-          count: products.filter(p => p.категория === 'Электроника').length,
-          children: ['Смартфоны', 'Ноутбуки', 'Планшеты', 'Наушники'],
-        },
-        {
-          text: 'Офисная техника',
-          icon: <Category />,
-          count: products.filter(p => p.категория === 'Офисная техника').length,
-          children: ['Принтеры', 'Сканеры', 'Копиры'],
-        },
-        {
-          text: 'Электроинструменты',
-          icon: <Category />,
-          count: products.filter(p => p.категория === 'Электрические инструменты').length,
-          children: ['Дрели', 'Пилы', 'Шуруповёрты', 'Болгарки'],
-        },
-        {
-          text: 'Умный дом',
-          icon: <Category />,
-          count: products.filter(p => p.категория === 'Канцелярия').length,
-          children: ['Док станция', 'Розетка', 'Выключатель', 'Пылесос'],
-        },
-        {
-          text: 'Красота и здоровье',
-          icon: <Category />,
-          count: products.filter(p => p.категория === 'Хозяйственные товары').length,
-          children: ['Фены', 'Плойки', 'Дипиляторы', 'Триммеры', 'Зубные щётки'],
-        },
-      ],
+      items: categories.map(category => ({
+        text: category.name,
+        icon: <CategoryIcon />,
+        count: products.filter(p => p.категория === category.name).length
+      })),
     },
   ];
 
@@ -334,6 +312,7 @@ export const ProductsPage: React.FC = () => {
     (sum, product) => sum + (product.количество * product.ценаПродажи),
     0
   );
+
 
   const handleChangePage = (event: unknown, newPage: number) => {
     setPage(newPage);

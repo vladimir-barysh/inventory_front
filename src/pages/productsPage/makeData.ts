@@ -1,3 +1,5 @@
+import apiClient from '../../api/axios';
+import { useState, useEffect, useCallback } from 'react';
 export interface Product {
   id: number;
   артикул: string;
@@ -61,3 +63,51 @@ export const productsData: Product[] = [
     единицаИзмерения: 'шт',
   },
 ];
+
+
+
+// ========== ТИПЫ ==========
+export interface Category {
+  id: number;
+  name: string;
+}
+
+export interface CategoryCreate {
+  name: string;
+}
+
+export interface CategoryUpdate {
+  name: string;
+}
+
+// ========== API ФУНКЦИИ ==========
+export const categoryApi = {
+  // Получить все категории
+  getAll: async (): Promise<Category[]> => {
+    const response = await apiClient.get('/categories/');
+    return response.data;
+  },
+
+  // Получить категорию по ID
+  getById: async (id: number): Promise<Category> => {
+    const response = await apiClient.get(`/categories/${id}`);
+    return response.data;
+  },
+
+  // Создать новую категорию
+  create: async (category: CategoryCreate): Promise<Category> => {
+    const response = await apiClient.post('/categories/', category);
+    return response.data;
+  },
+
+  // Обновить категорию
+  update: async (id: number, category: CategoryUpdate): Promise<Category> => {
+    const response = await apiClient.put(`/categories/${id}`, category);
+    return response.data;
+  },
+
+  // Удалить категорию
+  delete: async (id: number): Promise<void> => {
+    await apiClient.delete(`/categories/${id}`);
+  },
+};
