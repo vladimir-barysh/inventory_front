@@ -1,70 +1,6 @@
 import apiClient from '../../api/axios';
-import { useState, useEffect, useCallback } from 'react';
-export interface Product {
-  id: number;
-  артикул: string;
-  наименование: string;
-  категория: string;
-  подкатегория: string;
-  ценаЗакупки: number;
-  ценаПродажи: number;
-  поставщик: string; // ID поставщика
-  количество: number;
-  единицаИзмерения: 'шт' | 'кг' | 'л' | 'м' | 'упак' | 'компл';
-}
 
 export type ProductFormData = Omit<Product, 'id'>;
-
-// Данные поставщиков
-export const suppliers = [
-  { id: '1', наименование: 'ООО "ТехноМир"' },
-  { id: '2', наименование: 'ИП Петров А.В.' },
-  { id: '3', наименование: 'АО "ОфисСнаб"' },
-  { id: '4', наименование: 'ЗАО "МебельПрофи"' },
-  { id: '5', наименование: 'ООО "Канцелярский рай"' },
-];
-
-// Данные товаров
-export const productsData: Product[] = [
-  {
-    id: 1,
-    артикул: 'SM-001',
-    наименование: 'Смартфон Samsung Galaxy S23',
-    категория: 'Электроника',
-    подкатегория: 'Смартфоны',
-    ценаЗакупки: 65000,
-    ценаПродажи: 79990,
-    поставщик: '1',
-    количество: 15,
-    единицаИзмерения: 'шт',
-  },
-  {
-    id: 2,
-    артикул: 'LP-001',
-    наименование: 'Ноутбук Lenovo IdeaPad',
-    категория: 'Электроника',
-    подкатегория: 'Ноутбуки',
-    ценаЗакупки: 45000,
-    ценаПродажи: 54990,
-    поставщик: '1',
-    количество: 8,
-    единицаИзмерения: 'шт',
-  },
-  {
-    id: 3,
-    артикул: 'PR-001',
-    наименование: 'Лазерный принтер HP',
-    категория: 'Офисная техника',
-    подкатегория: 'Принтеры',
-    ценаЗакупки: 12000,
-    ценаПродажи: 15990,
-    поставщик: '3',
-    количество: 0,
-    единицаИзмерения: 'шт',
-  },
-];
-
-
 
 // ========== ТИПЫ ==========
 export interface Category {
@@ -79,6 +15,38 @@ export interface CategoryCreate {
 export interface CategoryUpdate {
   name: string;
 }
+
+export interface Product {
+  id: number;
+  article: string;
+  name: string;
+  purchase_price: number;
+  sell_price: number;
+  is_active: number;
+  category_id: number;
+  unit_id: number;
+}
+
+export interface ProductCreate {
+  article: string;
+  name: string;
+  purchase_price: number;
+  sell_price: number;
+  is_active: number;
+  category_id: number;
+  unit_id: number;
+}
+
+export interface ProductUpdate {
+  article: string;
+  name: string;
+  purchase_price: number;
+  sell_price: number;
+  is_active: number;
+  category_id: number;
+  unit_id: number;
+}
+
 
 // ========== API ФУНКЦИИ ==========
 export const categoryApi = {
@@ -109,5 +77,37 @@ export const categoryApi = {
   // Удалить категорию
   delete: async (id: number): Promise<void> => {
     await apiClient.delete(`/categories/${id}`);
+  },
+};
+
+export const productApi ={
+  getAll: async (): Promise<Product[]> => {
+    const response = await apiClient.get('/products/');
+    return response.data;
+  },
+
+  // Получить по ID
+  getById: async (id: number): Promise<Product> => {
+    const response = await apiClient.get(`/products/${id}`);
+    return response.data;
+  },
+
+  create: async (product: ProductCreate): Promise<Product> => {
+    const response = await apiClient.post('/products/', product);
+    return response.data;
+  },
+
+  update: async (id: number, product: ProductUpdate): Promise<Product> => {
+    const response = await apiClient.put(`/products/${id}`, product);
+    return response.data;
+  },
+
+  delete: async (id: number): Promise<void> => {
+    await apiClient.delete(`/products/${id}`);
+  },
+
+  getQuantity: async (id: number, zone?: number): Promise<number> => {
+    const response = await apiClient.get(`/products/${id}/quantity`);
+    return response.data.total_quantity;  
   },
 };

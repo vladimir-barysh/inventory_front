@@ -24,7 +24,7 @@ import {
   Numbers, Tag,
 } from '@mui/icons-material';
 import { SecondSidebar } from './../../components';
-import { Product, productsData, ProductFormData, suppliers, categoryApi, Category } from './makeData';
+import { Product, productApi, ProductFormData, categoryApi, Category } from './makeData';
 
 import AdminOnly from '../../components/AdminOnly';
 
@@ -51,26 +51,13 @@ interface ProductDialogProps {
   isEdit?: boolean;
 }
 
-const ProductDialog: React.FC<ProductDialogProps> = ({
+/*const ProductDialog: React.FC<ProductDialogProps> = ({
   open,
   onClose,
   onSubmit,
   initialData,
   isEdit = false,
 }) => {
-  const [formData, setFormData] = useState<ProductFormData>(
-    initialData || {
-      артикул: '',
-      наименование: '',
-      категория: '',
-      подкатегория: '',
-      ценаЗакупки: 0,
-      ценаПродажи: 0,
-      поставщик: '',
-      количество: 0,
-      единицаИзмерения: 'шт',
-    }
-  );
 
   const handleChange = (field: keyof ProductFormData, value: string | number) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -91,7 +78,7 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
       </DialogTitle>
       <DialogContent>
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 2 }}>
-        {/* Основная информация */}
+        {/* Основная информация 
         <Typography variant="subtitle2" color="text.secondary">
             Основная информация
         </Typography>
@@ -99,8 +86,8 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
         <Box sx={{ display: 'flex', gap: 2 }}>
             <TextField
             label="Артикул"
-            value={formData.артикул}
-            onChange={(e) => handleChange('артикул', e.target.value)}
+            value={formData.article}
+            onChange={(e) => handleChange('article', e.target.value)}
             fullWidth
             required
             InputProps={{
@@ -120,7 +107,7 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
             />
         </Box>
 
-        {/* Категории */}
+        {/* Категории *
         <Box sx={{ display: 'flex', gap: 2 }}>
             <TextField
             label="Категория"
@@ -143,7 +130,7 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
             />
         </Box>
 
-        {/* Цены */}
+        {/* Цены 
         <Typography variant="subtitle2" color="text.secondary">
             Цены
         </Typography>
@@ -178,7 +165,7 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
             />
         </Box>
 
-        {/* Склад и поставщик */}
+        {/* Склад и поставщик *
         <Typography variant="subtitle2" color="text.secondary">
             Склад и поставщик
         </Typography>
@@ -214,7 +201,7 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
             </FormControl>
         </Box>
 
-        {/* Поставщик */}
+        {/* Поставщик *
         <FormControl fullWidth>
             <InputLabel>Поставщик</InputLabel>
             <Select
@@ -244,10 +231,10 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
             </DialogActions>
             </Dialog>
         );
-        };
+        };*/
 
 export const ProductsPage: React.FC = () => {
-  const [products, setProducts] = useState<Product[]>(productsData);
+  const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
@@ -260,24 +247,49 @@ export const ProductsPage: React.FC = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [selectedCategory, setSelectedCategory] = useState<number | null>(null);
 
   useEffect(() => {
-    loadCategories();
-  });
+    // Первоначальная загрузка
+    loadAllData();
+    
+    // Настраиваем интервал для обновления каждые 10 секунд
+    const intervalId = setInterval(() => {
+      console.log('Автоматическое обновление данных...');
+      loadAllData();
+    }, 10000); // 10000 мс = 10 секунд
+    
+    // Очистка интервала при размонтировании компонента
+    return () => {
+      clearInterval(intervalId);
+      console.log('Интервал очищен');
+    };
+  }, []); // Пустой массив зависимостей = запуск только при монтировании
 
-   // Функция загрузки категорий через API
-  const loadCategories = async () => {
+  const loadAllData = async () => {
     setLoading(true);
     setError(null);
     
     try {
-      const data = await categoryApi.getAll();
-      setCategories(data);
-      console.log('Категории загружены:', data);
-    } catch (err) {
-      console.error('Ошибка загрузки категорий:', err);
-      setError('Не удалось загрузить категории');
+      // Загружаем параллельно для скорости
+      const [productsData, categoriesData] = await Promise.all([
+        productApi.getAll(),
+        categoryApi.getAll()
+      ]);
+      
+      setProducts(productsData);
+      setCategories(categoriesData);
+      
+      console.log('Данные обновлены:', {
+        products: productsData.length,
+        categories: categoriesData.length,
+        timestamp: new Date().toLocaleTimeString()
+      });
+      
+    } catch (err: any) {
+      const errorMessage = err.response?.data?.detail || 'Ошибка загрузки данных';
+      setError(errorMessage);
+      console.error('Ошибка загрузки:', err);
     } finally {
       setLoading(false);
     }
@@ -289,29 +301,37 @@ export const ProductsPage: React.FC = () => {
       items: categories.map(category => ({
         text: category.name,
         icon: <CategoryIcon />,
-        count: products.filter(p => p.категория === category.name).length
+        count: products.filter(p => p.category_id === category.id).length
       })),
     },
   ];
 
   // Фильтрация товаров
   const filteredProducts = products.filter(product => {
-    const matchesSearch =
-      product.артикул.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      product.наименование.toLowerCase().includes(searchTerm.toLowerCase());
+    // Безопасный поиск по article
+    const articleMatch = product.article 
+      ? product.article.toString().toLowerCase().includes(searchTerm.toLowerCase())
+      : false;
+    
+    // Безопасный поиск по name
+    const nameMatch = product.name 
+      ? product.name.toLowerCase().includes(searchTerm.toLowerCase())
+      : false;
+    
+    const matchesSearch = articleMatch || nameMatch;
 
+    // Если категория не выбрана - пропускаем проверку
     const matchesCategory = !selectedCategory || 
-      product.категория === selectedCategory ||
-      product.подкатегория === selectedCategory;
-
+      product.category_id === selectedCategory;
+    
     return matchesSearch && matchesCategory;
   });
 
-  // Стоимость найденых товаров
+  /*/ Стоимость найденых товаров
   const filteredInventoryValue = filteredProducts.reduce(
-    (sum, product) => sum + (product.количество * product.ценаПродажи),
+    (sum, product) => sum + (productApi.getQuantity(product.id, 0) * product.sell_price),
     0
-  );
+  );*/
 
 
   const handleChangePage = (event: unknown, newPage: number) => {
@@ -376,15 +396,34 @@ export const ProductsPage: React.FC = () => {
   };
 
   const handleCategoryClick = (category: string) => {
-    setSelectedCategory(category);
+    const foundCategory = categories.find(c => {
+      const categoryName = c.name;
+      return categoryName === category;
+    });
+    setSelectedCategory(foundCategory ? foundCategory.id : null);
     setPage(0);
   };
 
-  // Найти поставщика по ID
-  const getSupplierName = (supplierId: string) => {
-    const supplier = suppliers.find(s => s.id === supplierId);
-    return supplier ? supplier.наименование : 'Не указан';
+  const findCategoryName = (product: Product) => {
+    const foundCategory = categories.find(c => {
+      const categoryId = c.id;
+      return categoryId === product.category_id;
+    });
+
+    return foundCategory?.name;
   };
+
+  const findUnitName = (product: Product) => {
+    switch (product.unit_id) {
+      case 1: return 'шт';
+      default: break;
+    }
+  }
+
+  const getProductAllQuantity = (product: Product) => {
+    const qnt = productApi.getQuantity(product.id, 1);
+    return qnt;
+  }
 
   return (
     <Box sx={{ display: 'flex', height: '88vh' }}>
@@ -450,8 +489,9 @@ export const ProductsPage: React.FC = () => {
                   color="primary"
                   sx={{ minWidth: 120, justifyContent: 'center' }}
                 />
+                {/*filteredInventoryValue.toLocaleString('ru-RU')*/}
                 <Chip
-                  label={`Стоимость: ${filteredInventoryValue.toLocaleString('ru-RU')} ₽`}
+                  label={`Стоимость:  0 ₽`}
                   variant="outlined"
                   color="success"
                   sx={{ minWidth: 150, justifyContent: 'center' }}
@@ -479,7 +519,7 @@ export const ProductsPage: React.FC = () => {
 
         {/* Таблица товаров */}
         <Paper sx={{ width: '100%', overflow: 'hidden' }}>
-          <TableContainer sx={{ maxHeight: 440 }}>
+          <TableContainer sx={{ maxHeight: 700 }}>
             <Table stickyHeader>
               <TableHead>
                 <TableRow>
@@ -488,7 +528,6 @@ export const ProductsPage: React.FC = () => {
                   <TableCell>Категория</TableCell>
                   <TableCell>Цена закупки</TableCell>
                   <TableCell>Цена продажи</TableCell>
-                  <TableCell>Поставщик</TableCell>
                   <TableCell>Количество</TableCell>
                   <AdminOnly>
                     <TableCell align="right">Действия</TableCell>
@@ -506,48 +545,43 @@ export const ProductsPage: React.FC = () => {
                     >
                       <TableCell>
                         <Typography variant="body2" color="text.secondary" fontWeight={600}>
-                          {product.артикул}
+                          {product.article}
                         </Typography>
                       </TableCell>
                       <TableCell>
                         <Box>
                           <Typography fontWeight={600}>
-                            {product.наименование}
+                            {product.name}
                           </Typography>
                         </Box>
                       </TableCell>
                       <TableCell>
                         <Box>
-                          <Typography variant="body2">{product.категория}</Typography>
-                          {product.подкатегория && (
-                            <Typography variant="caption" color="text.secondary">
-                              {product.подкатегория}
-                            </Typography>
-                          )}
+                          <Typography variant="body2">
+                            {
+                              findCategoryName(product)
+                            }
+                          </Typography>
                         </Box>
                       </TableCell>
                       <TableCell>
                         <Typography fontWeight={500} color="text.secondary">
-                          {product.ценаЗакупки.toLocaleString('ru-RU')} ₽
+                          {product.purchase_price.toLocaleString('ru-RU')} ₽
                         </Typography>
                       </TableCell>
                       <TableCell>
                         <Typography fontWeight={600} color="primary">
-                          {product.ценаПродажи.toLocaleString('ru-RU')} ₽
+                          {product.sell_price.toLocaleString('ru-RU')} ₽
                         </Typography>
                       </TableCell>
-                      <TableCell>
-                        <Typography variant="body2">
-                          {getSupplierName(product.поставщик)}
-                        </Typography>
-                      </TableCell>
+                      
                       <TableCell>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                           <Typography fontWeight={500}>
-                            {product.количество}
+                            0
                           </Typography>
                           <Typography variant="caption" color="text.secondary">
-                            {product.единицаИзмерения}
+                            {findUnitName(product)}
                           </Typography>
                         </Box>
                       </TableCell>
@@ -602,36 +636,36 @@ export const ProductsPage: React.FC = () => {
           </MenuItem>
         </Menu>
 
-        {/* Диалог добавления/редактирования */}
+        {/* Диалог добавления/редактирования *
         <ProductDialog
           open={dialogOpen}
           onClose={() => setDialogOpen(false)}
           onSubmit={handleDialogSubmit}
           initialData={selectedProduct || undefined}
           isEdit={isEditing}
-        />
+        />*/}
 
         {/* Диалог подтверждения удаления */}
         <Dialog open={deleteDialogOpen} onClose={() => setDeleteDialogOpen(false)}>
           <DialogTitle>Подтверждение удаления</DialogTitle>
           <DialogContent>
             <Alert severity="warning" sx={{ mb: 2 }}>
-              Вы уверены, что хотите удалить товар "{selectedProduct?.наименование}"?
+              Вы уверены, что хотите удалить товар "{selectedProduct?.name}"?
               Это действие нельзя отменить.
             </Alert>
             {selectedProduct && (
               <Box sx={{ mt: 2 }}>
                 <Typography variant="body2" color="text.secondary">
-                  <strong>Артикул:</strong> {selectedProduct.артикул}
+                  <strong>Артикул:</strong> {selectedProduct.article}
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
-                  <strong>Категория:</strong> {selectedProduct.категория}
+                  <strong>Категория:</strong> {selectedProduct.category_id}
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
-                  <strong>Цена продажи:</strong> {selectedProduct.ценаПродажи.toLocaleString('ru-RU')} ₽
+                  <strong>Цена продажи:</strong> {selectedProduct.sell_price.toLocaleString('ru-RU')} ₽
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
-                  <strong>Количество на складе:</strong> {selectedProduct.количество} {selectedProduct.единицаИзмерения}
+                  <strong>Количество на складе: 0</strong> {selectedProduct.unit_id}
                 </Typography>
               </Box>
             )}
