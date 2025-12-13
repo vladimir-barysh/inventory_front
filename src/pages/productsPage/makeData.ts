@@ -1,6 +1,5 @@
 import apiClient from '../../api/axios';
 
-export type ProductFormData = Omit<Product, 'id'>;
 
 // ========== ТИПЫ ==========
 export interface Category {
@@ -18,7 +17,7 @@ export interface CategoryUpdate {
 
 export interface Product {
   id: number;
-  article: string;
+  article: number;
   name: string;
   purchase_price: number;
   sell_price: number;
@@ -26,9 +25,10 @@ export interface Product {
   category_id: number;
   unit_id: number;
 }
+export type ProductFormData = Omit<Product, 'id'>;
 
 export interface ProductCreate {
-  article: string;
+  article: number;
   name: string;
   purchase_price: number;
   sell_price: number;
@@ -38,13 +38,18 @@ export interface ProductCreate {
 }
 
 export interface ProductUpdate {
-  article: string;
+  article: number;
   name: string;
   purchase_price: number;
   sell_price: number;
   is_active: number;
   category_id: number;
   unit_id: number;
+}
+
+export interface Unit {
+  id: number;
+  name: string;
 }
 
 
@@ -93,21 +98,28 @@ export const productApi ={
   },
 
   create: async (product: ProductCreate): Promise<Product> => {
-    const response = await apiClient.post('/products/', product);
+    const response = await apiClient.post('/products/create', product);
     return response.data;
   },
 
   update: async (id: number, product: ProductUpdate): Promise<Product> => {
-    const response = await apiClient.put(`/products/${id}`, product);
+    const response = await apiClient.put(`/products/${id}/update`, product);
     return response.data;
   },
 
   delete: async (id: number): Promise<void> => {
-    await apiClient.delete(`/products/${id}`);
+    await apiClient.delete(`/products/${id}/delete`);
   },
 
   getQuantity: async (id: number, zone?: number): Promise<number> => {
     const response = await apiClient.get(`/products/${id}/quantity`);
     return response.data.total_quantity;  
   },
+};
+
+export const unitApi = {
+  getAll: async (): Promise<Unit[]> => {
+    const response = await apiClient.get(`/units/`);
+    return response.data;
+  }
 };

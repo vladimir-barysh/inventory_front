@@ -13,7 +13,8 @@ import {
   Select, MenuItem,
   Menu, ListItemIcon,
   ListItemText, Alert,
-  Chip,
+  Chip, Checkbox,
+  FormControlLabel
 } from '@mui/material';
 import {
   Search, Add,
@@ -22,9 +23,10 @@ import {
   Inventory, AttachMoney,
   ShoppingCart, Store,
   Numbers, Tag,
+  CheckBox as CheckBoxIcon,
 } from '@mui/icons-material';
 import { SecondSidebar } from './../../components';
-import { Product, productApi, ProductFormData, categoryApi, Category } from './makeData';
+import { Product, productApi, ProductFormData, categoryApi, Category, unitApi, Unit } from './makeData';
 
 import AdminOnly from '../../components/AdminOnly';
 
@@ -49,22 +51,47 @@ interface ProductDialogProps {
   onSubmit: (data: ProductFormData) => void;
   initialData?: ProductFormData;
   isEdit?: boolean;
+  categories: Category[];
+  units: Unit[];
 }
 
-/*const ProductDialog: React.FC<ProductDialogProps> = ({
+const ProductDialog: React.FC<ProductDialogProps> = ({
   open,
   onClose,
   onSubmit,
   initialData,
   isEdit = false,
+  categories = [],
+  units = [],
 }) => {
+   const formData = React.useMemo(() => {
+    
+    return initialData || {
+      article: 0,
+      name: '',
+      purchase_price: 0,
+      sell_price: 0,
+      is_active: 1,
+      category_id: 0,
+      unit_id: 1,
+    };
+  }, [initialData, open]);
+
+  // Локальное состояние для отслеживания изменений
+  const [localData, setLocalData] = useState<ProductFormData>(formData);
+
+  useEffect(() => {
+    console.log('🔄 Обновляем localData с новыми данными:', formData);
+    setLocalData(formData);
+  }, [formData]);
 
   const handleChange = (field: keyof ProductFormData, value: string | number) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+    console.log(`📝 Изменение поля ${field}:`, value);
+    setLocalData(prev => ({ ...prev, [field]: value }));
   };
 
   const handleSubmit = () => {
-    onSubmit(formData);
+    onSubmit(localData);
     onClose();
   };
 
@@ -78,7 +105,7 @@ interface ProductDialogProps {
       </DialogTitle>
       <DialogContent>
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 2 }}>
-        {/* Основная информация 
+        {/* Основная информация */}
         <Typography variant="subtitle2" color="text.secondary">
             Основная информация
         </Typography>
@@ -86,7 +113,7 @@ interface ProductDialogProps {
         <Box sx={{ display: 'flex', gap: 2 }}>
             <TextField
             label="Артикул"
-            value={formData.article}
+            value={localData.article}
             onChange={(e) => handleChange('article', e.target.value)}
             fullWidth
             required
@@ -100,37 +127,32 @@ interface ProductDialogProps {
             />
             <TextField
             label="Наименование"
-            value={formData.наименование}
-            onChange={(e) => handleChange('наименование', e.target.value)}
+            value={localData.name}
+            onChange={(e) => handleChange('name', e.target.value)}
             fullWidth
             required
             />
         </Box>
 
-        {/* Категории *
+        {/* Категории */}
         <Box sx={{ display: 'flex', gap: 2 }}>
-            <TextField
-            label="Категория"
-            value={formData.категория}
-            onChange={(e) => handleChange('категория', e.target.value)}
-            fullWidth
-            InputProps={{
-                startAdornment: (
-                <InputAdornment position="start">
-                    <CategoryIcon fontSize="small" />
-                </InputAdornment>
-                ),
-            }}
-            />
-            <TextField
-            label="Подкатегория"
-            value={formData.подкатегория}
-            onChange={(e) => handleChange('подкатегория', e.target.value)}
-            fullWidth
-            />
+            <FormControl fullWidth>
+            <InputLabel>Категория</InputLabel>
+            <Select
+                value={localData.category_id}
+                label="Категория"
+                onChange={(e) => handleChange('category_id', e.target.value)}
+            >
+              {categories.map((category) => (
+                <MenuItem key={category.id} value={category.id}>
+                  {category.name}
+                </MenuItem>
+              ))}
+            </Select>
+            </FormControl>
         </Box>
 
-        {/* Цены 
+        {/* Цены */}
         <Typography variant="subtitle2" color="text.secondary">
             Цены
         </Typography>
@@ -138,89 +160,56 @@ interface ProductDialogProps {
             <TextField
             label="Цена закупки (₽)"
             type="number"
-            value={formData.ценаЗакупки}
-            onChange={(e) => handleChange('ценаЗакупки', parseFloat(e.target.value) || 0)}
+            value={localData.purchase_price}
+            onChange={(e) => handleChange('purchase_price', parseFloat(e.target.value) || 0)}
             fullWidth
-            InputProps={{
-                startAdornment: (
-                <InputAdornment position="start">
-                    <ShoppingCart fontSize="small" />
-                </InputAdornment>
-                ),
-            }}
             />
             <TextField
             label="Цена продажи (₽)"
             type="number"
-            value={formData.ценаПродажи}
-            onChange={(e) => handleChange('ценаПродажи', parseFloat(e.target.value) || 0)}
+            value={localData.sell_price}
+            onChange={(e) => handleChange('sell_price', parseFloat(e.target.value) || 0)}
             fullWidth
-            InputProps={{
-                startAdornment: (
-                <InputAdornment position="start">
-                    <AttachMoney fontSize="small" />
-                </InputAdornment>
-                ),
-            }}
             />
         </Box>
 
-        {/* Склад и поставщик *
         <Typography variant="subtitle2" color="text.secondary">
-            Склад и поставщик
+            Дополнительная информация
         </Typography>
-        <Box sx={{ display: 'flex', gap: 2 }}>
-            <TextField
-            label="Количество"
-            type="number"
-            value={formData.количество}
-            onChange={(e) => handleChange('количество', parseInt(e.target.value) || 0)}
-            fullWidth
-            InputProps={{
-                startAdornment: (
-                <InputAdornment position="start">
-                    <Numbers fontSize="small" />
-                </InputAdornment>
-                ),
-            }}
-            />
+        <Box sx={{ display: 'flex', gap: 5 }}>
             <FormControl fullWidth>
             <InputLabel>Единица измерения</InputLabel>
             <Select
-                value={formData.единицаИзмерения}
+                value={localData.unit_id}
                 label="Единица измерения"
-                onChange={(e) => handleChange('единицаИзмерения', e.target.value)}
+                onChange={(e) => handleChange('unit_id', e.target.value)}
             >
-                <MenuItem value="шт">Штуки (шт)</MenuItem>
-                <MenuItem value="кг">Килограммы (кг)</MenuItem>
-                <MenuItem value="л">Литры (л)</MenuItem>
-                <MenuItem value="м">Метры (м)</MenuItem>
-                <MenuItem value="упак">Упаковки</MenuItem>
-                <MenuItem value="компл">Комплекты</MenuItem>
+                {units.map((unit) => (
+                <MenuItem key={unit.id} value={unit.id}>
+                  {unit.name}
+                </MenuItem>
+              ))}
             </Select>
             </FormControl>
+
+            {!localData.is_active && (
+            <FormControlLabel 
+              sx ={{
+                minWidth: '100px'
+              }}
+              control={
+                <Checkbox 
+                  checked={
+                    localData.is_active? true: false
+                  }
+                  onChange={(e) => handleChange('is_active', e.target.value)}
+                />
+              } 
+              label="Восстановить товар"
+            />)}
+
         </Box>
 
-        {/* Поставщик *
-        <FormControl fullWidth>
-            <InputLabel>Поставщик</InputLabel>
-            <Select
-            value={formData.поставщик}
-            label="Поставщик"
-            onChange={(e) => handleChange('поставщик', e.target.value)}
-            startAdornment={
-                <InputAdornment position="start">
-                <Store fontSize="small" />
-                </InputAdornment>
-            }
-            >
-            {suppliers.map((supplier) => (
-                <MenuItem key={supplier.id} value={supplier.id}>
-                {supplier.наименование}
-                </MenuItem>
-            ))}
-            </Select>
-        </FormControl>
         </Box>
             </DialogContent>
             <DialogActions>
@@ -231,16 +220,17 @@ interface ProductDialogProps {
             </DialogActions>
             </Dialog>
         );
-        };*/
+        };
 
 export const ProductsPage: React.FC = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [units, setUnits] = useState<Unit[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
   const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [rowsPerPage, setRowsPerPage] = useState(15);
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -272,13 +262,15 @@ export const ProductsPage: React.FC = () => {
     
     try {
       // Загружаем параллельно для скорости
-      const [productsData, categoriesData] = await Promise.all([
+      const [productsData, categoriesData, unitsData] = await Promise.all([
         productApi.getAll(),
-        categoryApi.getAll()
+        categoryApi.getAll(),
+        unitApi.getAll(),
       ]);
       
       setProducts(productsData);
       setCategories(categoriesData);
+      setUnits(unitsData);
       
       console.log('Данные обновлены:', {
         products: productsData.length,
@@ -293,6 +285,18 @@ export const ProductsPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const convertToFormData = (product: Product): ProductFormData => {
+    return {
+      article: product.article,
+      name: product.name,
+      purchase_price: product.purchase_price,
+      sell_price: product.sell_price,
+      is_active: product.is_active,
+      category_id: product.category_id,
+      unit_id: product.unit_id,
+    };
   };
 
   const categorySections: CategorySection[] = [
@@ -350,28 +354,33 @@ export const ProductsPage: React.FC = () => {
 
   const handleMenuClose = () => {
     setAnchorEl(null);
-    setSelectedProduct(null);
   };
 
   const handleAddProduct = () => {
+    setSelectedProduct(null);
     setIsEditing(false);
     setDialogOpen(true);
   };
 
   const handleEditProduct = () => {
+
+    if (!selectedProduct) {
+      return;
+    }
+    
     setIsEditing(true);
     setDialogOpen(true);
-    handleMenuClose();
+    setAnchorEl(null);
   };
 
   const handleDeleteClick = () => {
     setDeleteDialogOpen(true);
-    handleMenuClose();
+    setAnchorEl(null);
   };
 
   const handleDeleteConfirm = () => {
     if (selectedProduct) {
-      setProducts(prev => prev.filter(p => p.id !== selectedProduct.id));
+      productApi.delete(selectedProduct.id);
     }
     setDeleteDialogOpen(false);
     setSelectedProduct(null);
@@ -380,18 +389,9 @@ export const ProductsPage: React.FC = () => {
   const handleDialogSubmit = (formData: ProductFormData) => {
     if (isEditing && selectedProduct) {
       // Редактирование существующего товара
-      setProducts(prev => prev.map(p =>
-        p.id === selectedProduct.id
-          ? { ...p, ...formData }
-          : p
-      ));
+      productApi.update(selectedProduct.id, formData);
     } else {
-      // Добавление нового товара
-      const newProduct: Product = {
-        id: Math.max(...products.map(p => p.id)) + 1,
-        ...formData,
-      };
-      setProducts(prev => [...prev, newProduct]);
+      productApi.create(formData);
     }
   };
 
@@ -414,10 +414,12 @@ export const ProductsPage: React.FC = () => {
   };
 
   const findUnitName = (product: Product) => {
-    switch (product.unit_id) {
-      case 1: return 'шт';
-      default: break;
-    }
+    const foundUnit = units.find(u => {
+      const unitId = u.id;
+      return unitId === product.unit_id;
+    });
+
+    return foundUnit?.name
   }
 
   const getProductAllQuantity = (product: Product) => {
@@ -435,15 +437,19 @@ export const ProductsPage: React.FC = () => {
       />
 
       {/* Основной контент */}
-      <Box sx={{ flex: 1, pl: 3, overflow: 'auto' }}>
+      <Box sx={{ flex: 1, 
+        pl: 3, 
+        display: 'flex', 
+        flexDirection: 'column', 
+        height: '100%'}}>
         {/* Заголовок и панель управления */}
-        <Box sx={{ mb: 4 }}>
+        <Box sx={{ mb: 2}}>
           <Typography color="text.secondary" paragraph>
             Управление товарным каталогом: добавление, редактирование и удаление товаров
           </Typography>
 
           {/* Панель поиска и управления */}
-          <Paper sx={{ p: 2, mb: 3 }}>
+          <Paper sx={{ p: 2, mb: 1 }}>
             <Box sx={{
               display: 'flex',
               flexDirection: { xs: 'column', md: 'row' },
@@ -518,104 +524,129 @@ export const ProductsPage: React.FC = () => {
         </Box>
 
         {/* Таблица товаров */}
-        <Paper sx={{ width: '100%', overflow: 'hidden' }}>
-          <TableContainer sx={{ maxHeight: 700 }}>
-            <Table stickyHeader>
-              <TableHead>
-                <TableRow>
-                  <TableCell>Артикул</TableCell>
-                  <TableCell>Наименование</TableCell>
-                  <TableCell>Категория</TableCell>
-                  <TableCell>Цена закупки</TableCell>
-                  <TableCell>Цена продажи</TableCell>
-                  <TableCell>Количество</TableCell>
-                  <AdminOnly>
-                    <TableCell align="right">Действия</TableCell>
-                  </AdminOnly>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {filteredProducts
-                  .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
-                  .map((product) => (
-                    <TableRow
-                      key={product.id}
-                      hover
-                      sx={{ cursor: 'pointer', '&:hover': { backgroundColor: 'action.hover' } }}
-                    >
-                      <TableCell>
-                        <Typography variant="body2" color="text.secondary" fontWeight={600}>
-                          {product.article}
-                        </Typography>
-                      </TableCell>
-                      <TableCell>
-                        <Box>
-                          <Typography fontWeight={600}>
-                            {product.name}
+        <Box sx={{ 
+          flex: '0 1 auto', 
+          display: 'flex', 
+          flexDirection: 'column',
+          minHeight: 0, // Важно для корректной работы overflow
+          overflow: 'hidden'
+        }}>
+          <Paper sx={{ 
+            width: '100%', 
+            flex: 1,
+            display: 'flex',
+            flexDirection: 'column',
+            overflow: 'hidden'
+          }}>
+            <TableContainer >
+              <Table stickyHeader>
+                <TableHead>
+                  <TableRow>
+                    <TableCell>Артикул</TableCell>
+                    <TableCell>Наименование</TableCell>
+                    <TableCell>Категория</TableCell>
+                    <TableCell>Цена закупки</TableCell>
+                    <TableCell>Цена продажи</TableCell>
+                    <TableCell>Количество</TableCell>
+                    <AdminOnly>
+                      <TableCell align="right">Действия</TableCell>
+                    </AdminOnly>
+                    
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {filteredProducts
+                    .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
+                    .map((product) => (
+                      <TableRow
+                        key={product.id}
+                        hover
+                        sx={{
+                          cursor: 'pointer',
+                          backgroundColor: product.is_active ? 'inherit' : '#f5f5f5', // Серый для неактивных
+                          '&:hover': { backgroundColor: product.is_active ? 'action.hover' : '#e0e0e0' },
+                          color: !product.is_active ? 'text.disabled' : 'inherit', // Серый для неактивных
+                          '& .MuiTableCell-root': {
+                            color: 'inherit' // Все ячейки наследуют цвет строки
+                          }
+                        }}
+                      >
+                        <TableCell>
+                          <Typography variant="body2" color="text.secondary" fontWeight={600}>
+                            {product.article}
                           </Typography>
-                        </Box>
-                      </TableCell>
-                      <TableCell>
-                        <Box>
-                          <Typography variant="body2">
-                            {
-                              findCategoryName(product)
-                            }
-                          </Typography>
-                        </Box>
-                      </TableCell>
-                      <TableCell>
-                        <Typography fontWeight={500} color="text.secondary">
-                          {product.purchase_price.toLocaleString('ru-RU')} ₽
-                        </Typography>
-                      </TableCell>
-                      <TableCell>
-                        <Typography fontWeight={600} color="primary">
-                          {product.sell_price.toLocaleString('ru-RU')} ₽
-                        </Typography>
-                      </TableCell>
-                      
-                      <TableCell>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                          <Typography fontWeight={500}>
-                            0
-                          </Typography>
-                          <Typography variant="caption" color="text.secondary">
-                            {findUnitName(product)}
-                          </Typography>
-                        </Box>
-                      </TableCell>
-                      <AdminOnly>
-                        <TableCell align="right">
-                          <IconButton
-                            size="small"
-                            onClick={(e) => handleMenuOpen(e, product)}
-                          >
-                            <MoreVert />
-                          </IconButton>
                         </TableCell>
-                      </AdminOnly>
-                    </TableRow>
-                  ))}
-              </TableBody>
-            </Table>
-          </TableContainer>
+                        <TableCell>
+                          <Box>
+                            <Typography fontWeight={600}>
+                              {product.name}
+                            </Typography>
+                          </Box>
+                        </TableCell>
+                        <TableCell>
+                          <Box>
+                            <Typography variant="body2">
+                              {
+                                findCategoryName(product)
+                              }
+                            </Typography>
+                          </Box>
+                        </TableCell>
+                        <TableCell>
+                          <Typography fontWeight={500} color="text.secondary">
+                            {product.purchase_price.toLocaleString('ru-RU')} ₽
+                          </Typography>
+                        </TableCell>
+                        <TableCell>
+                          <Typography fontWeight={600} color="primary">
+                            {product.sell_price.toLocaleString('ru-RU')} ₽
+                          </Typography>
+                        </TableCell>
+                        
+                        <TableCell>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <Typography fontWeight={500}>
+                              0
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary">
+                              {findUnitName(product)}
+                            </Typography>
+                          </Box>
+                        </TableCell>
+                        <AdminOnly>
+                          <TableCell align="right">
+                            <IconButton
+                              size="small"
+                              onClick={(e) => handleMenuOpen(e, product)}
+                            >
+                              <MoreVert />
+                            </IconButton>
+                          </TableCell>
+                        </AdminOnly>
+                      </TableRow>
+                    ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
 
-          <TablePagination
-            rowsPerPageOptions={[5, 10, 25]}
-            component="div"
-            count={filteredProducts.length}
-            rowsPerPage={rowsPerPage}
-            page={page}
-            onPageChange={handleChangePage}
-            onRowsPerPageChange={handleChangeRowsPerPage}
-            labelRowsPerPage="Строк на странице:"
-            labelDisplayedRows={({ from, to, count }) =>
-              `${from}-${to} из ${count}`
-            }
-          />
-        </Paper>
-
+            <TablePagination
+              rowsPerPageOptions={[8, 15, 30]}
+              component="div"
+              count={filteredProducts.length}
+              rowsPerPage={rowsPerPage}
+              page={page}
+              onPageChange={handleChangePage}
+              onRowsPerPageChange={handleChangeRowsPerPage}
+              labelRowsPerPage="Строк на странице:"
+              labelDisplayedRows={({ from, to, count }) =>
+                `${from}-${to} из ${count}`
+              }
+              sx = {{
+                height:'60px'
+              }}
+            />
+          </Paper>
+        </Box>
         {/* Меню действий для товара */}
         <Menu
           anchorEl={anchorEl}
@@ -628,29 +659,36 @@ export const ProductsPage: React.FC = () => {
             </ListItemIcon>
             <ListItemText>Редактировать</ListItemText>
           </MenuItem>
-          <MenuItem onClick={handleDeleteClick}>
-            <ListItemIcon>
-              <Delete fontSize="small" />
-            </ListItemIcon>
-            <ListItemText>Удалить</ListItemText>
-          </MenuItem>
+          {selectedProduct?.is_active && (
+            <MenuItem onClick={handleDeleteClick}>
+              <ListItemIcon>
+                <Delete fontSize="small" />
+              </ListItemIcon>
+              <ListItemText>Удалить</ListItemText>
+            </MenuItem>
+          )}
         </Menu>
 
-        {/* Диалог добавления/редактирования *
+        {/* Диалог добавления/редактирования */}
         <ProductDialog
           open={dialogOpen}
-          onClose={() => setDialogOpen(false)}
+          onClose={() => {
+            setDialogOpen(false);
+            setSelectedProduct(null);}
+          }
           onSubmit={handleDialogSubmit}
-          initialData={selectedProduct || undefined}
+          initialData={selectedProduct? convertToFormData(selectedProduct) : undefined}
           isEdit={isEditing}
-        />*/}
+          categories={categories}
+          units={units}
+        />
 
         {/* Диалог подтверждения удаления */}
         <Dialog open={deleteDialogOpen} onClose={() => setDeleteDialogOpen(false)}>
           <DialogTitle>Подтверждение удаления</DialogTitle>
           <DialogContent>
             <Alert severity="warning" sx={{ mb: 2 }}>
-              Вы уверены, что хотите удалить товар "{selectedProduct?.name}"?
+              Вы уверены, что хотите удалить (скрыть) товар "{selectedProduct?.name}"?
               Это действие нельзя отменить.
             </Alert>
             {selectedProduct && (
