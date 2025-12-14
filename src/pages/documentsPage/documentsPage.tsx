@@ -1,4 +1,4 @@
-import React, { useState} from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box,
   Typography,
@@ -28,15 +28,15 @@ import {
   MoreVert,
   Description,
   Assessment,
-  Download,
-  Print,
   ShoppingCart,
   Inventory,
   RemoveCircle,
   ArrowForward,
 } from '@mui/icons-material';
-import { SecondSidebar,DocumentLineDialog, DocumentAddDialog, DocumentDeleteDialog } from './../../components';
-import { Document, documentsData, DocumentFormData, mockProducts, mockSuppliers } from './makeData';
+import { SecondSidebar, DocumentLineDialog, DocumentAddDialog, DocumentDeleteDialog } from './../../components';
+
+import { DocumentType, documentTypeApi, Document, documentApi, DocumentCreate, DocumentUpdate } from './makeData';
+import { Company, getCompanies } from '../../pages';
 
 // Типы для категорий документов
 interface CategoryItem {
@@ -51,47 +51,61 @@ interface CategorySection {
 }
 
 // Компонент для отображения типа документа
-const DocumentTypeChip: React.FC<{ type: Document['тип']}> = ({ type}) => {
+interface DocumentTypeChipProps {
+  typeId: number; // ID типа документа
+  documentTypes: DocumentType[]; // Массив типов из БД
+}
+
+const DocumentTypeChip: React.FC<DocumentTypeChipProps> = ({ typeId, documentTypes }) => {
+  // Находим тип документа по ID
+  const documentType = documentTypes.find(type => type.id === typeId);
+
+  // Конфигурация для каждого типа
   const typeConfig = {
-    'приходная': { 
-      bgColor: '#d4edda', 
+    1: { // Приход (ID: 1)
+      bgColor: '#d4edda',
       color: '#155724',
       icon: <ShoppingCart fontSize="small" />,
-      label: 'Приходная'
+      label: 'Приход'
     },
-    'расходная': { 
-      bgColor: '#f8d7da', 
+    2: { // Расход (ID: 2)
+      bgColor: '#f8d7da',
       color: '#721c24',
       icon: <ShoppingCart fontSize="small" />,
-      label: 'Расходная'
+      label: 'Расход'
     },
-    'инвентаризация': { 
-      bgColor: '#fff3cd', 
-      color: '#856404',
-      icon: <Inventory fontSize="small" />,
-      label: 'Инвентаризация'
-    },
-    'списание': { 
-      bgColor: '#d1ecf1', 
-      color: '#0c5460',
-      icon: <RemoveCircle fontSize="small" />,
-      label: 'Списание'
-    },
-    'перемещение': { 
-      bgColor: '#cce5ff', 
+    3: { // Перемещение (ID: 3)
+      bgColor: '#cce5ff',
       color: '#004085',
       icon: <ArrowForward fontSize="small" />,
       label: 'Перемещение'
     },
-    'отчёт': { 
-      bgColor: '#e6ccff', 
+    4: { // Инвентаризация (ID: 4)
+      bgColor: '#fff3cd',
+      color: '#856404',
+      icon: <Inventory fontSize="small" />,
+      label: 'Инвентаризация'
+    },
+    5: { // Списание (ID: 5)
+      bgColor: '#d1ecf1',
+      color: '#0c5460',
+      icon: <RemoveCircle fontSize="small" />,
+      label: 'Списание'
+    },
+    6: { // Отчёт (ID: 6)
+      bgColor: '#e6ccff',
       color: '#6610f2',
       icon: <Assessment fontSize="small" />,
       label: 'Отчёт'
     },
   };
 
-  const config = typeConfig[type];
+  const config = documentType ? typeConfig[documentType.id as keyof typeof typeConfig] : {
+    bgColor: '#e0e0e0',
+    color: '#424242',
+    icon: <Description fontSize="small" />,
+    label: 'Неизвестный тип'
+  };
   
   return (
     <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
@@ -110,7 +124,6 @@ const DocumentTypeChip: React.FC<{ type: Document['тип']}> = ({ type}) => {
 };
 
 export const DocumentsPage: React.FC = () => {
-  const [documents, setDocuments] = useState<Document[]>(documentsData);
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
@@ -120,62 +133,83 @@ export const DocumentsPage: React.FC = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedType, setSelectedType] = useState<string | null>(null);
+  const [selectedTypeId, setSelectedTypeId] = useState<number | null>(null);
+
+
+  const [editingDocument, setEditingDocument] = useState<Document | null>(null);
+  const [documents, setDocuments] = useState<Document[]>([]);
+  const [documentTypes, setDocumentTypes] = useState<DocumentType[]>([]);       // Типы документов из бд
+  const [companies, setCompanies] = useState<Company[]>([]);
+  const [loading, setLoading] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    // Первоначальная загрузка
+    loadAllData();
+    
+    // Настраиваем интервал для обновления каждые 10 секунд, НО ТОЛЬКО ЕСЛИ НЕ РЕДАКТИРУЕМ/НЕ ДОБАВЛЯЕМ
+    const intervalId = setInterval(() => {
+      if (!dialogOpen && !fillDialogOpen && !deleteDialogOpen) {
+        console.log('Автоматическое обновление данных...');
+        loadAllData();
+      } else {
+        console.log('Пропускаем автообновление: открыт диалог');
+      }
+    }, 10000);
+    
+    return () => {
+      clearInterval(intervalId);
+      console.log('Интервал очищен');
+    };
+  }, [dialogOpen, fillDialogOpen, deleteDialogOpen]);
+
+  const loadAllData = async () => {
+    setLoading(true);
+    setError(null);
+    
+    try {
+      // Загружаем все данные параллельно
+      const [types, docs, comps] = await Promise.all([
+        documentTypeApi.getAll(),
+        documentApi.getAll(),
+        getCompanies()
+      ]);
+      
+      setDocumentTypes(types);
+      setDocuments(docs);
+      setCompanies(comps);
+    } catch (err) {
+      setError('Не удалось загрузить данные');
+      console.error('Ошибка загрузки данных:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Категории для сайдбара
   const categorySections: CategorySection[] = [
     {
-      title: 'Входные документы',
-      items: [
-        {
-          text: 'Приходные накладные',
-          icon: <Description />,
-          count: documents.filter(d => d.тип === 'приходная').length,
-        },
-        {
-          text: 'Расходные накладные',
-          icon: <Description />,
-          count: documents.filter(d => d.тип === 'расходная').length,
-        },
-        {
-          text: 'Акты инвентаризации',
-          icon: <Description />,
-          count: documents.filter(d => d.тип === 'инвентаризация').length,
-        },
-        {
-          text: 'Акты списания',
-          icon: <Description />,
-          count: documents.filter(d => d.тип === 'списание').length,
-        },
-        {
-          text: 'Заявки на перемещение',
-          icon: <Description />,
-          count: documents.filter(d => d.тип === 'перемещение').length,
-        },
-        {
-          text: 'Отчёты',
-          icon: <Description />,
-          count: documents.filter(d => d.тип === 'отчёт').length,
-        },
-      ],
+      title: 'Типы документов',
+      items: documentTypes.map(type => ({
+        text: type.name,
+        icon: <Description />,
+        count: documents.filter(d => d.document_type_id === type.id).length,
+      })),
     },
   ];
 
   // Фильтрация документов
   const filteredDocuments = documents.filter(document => {
+    // Находим компанию по ID
+    const company = companies.find(c => c.id === document.company_id);
+    
     const matchesSearch =
-      document.номер.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      document.комментарий.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      document.дата.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (document.поставщик && document.поставщик.toLowerCase().includes(searchTerm.toLowerCase())) ||
-      (document.строки && document.строки.some(line => 
-        line.наименование.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        line.артикул.toLowerCase().includes(searchTerm.toLowerCase())
-    ));
+      document.number.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      document.comment.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      document.date.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (company && company.name.toLowerCase().includes(searchTerm.toLowerCase()));
 
-    const matchesType = !selectedType || 
-      (selectedType === 'Отчёты' && document.тип === 'отчёт') ||
-      (document.тип === selectedType);
+    const matchesType = !selectedTypeId || document.document_type_id === selectedTypeId;
 
     return matchesSearch && matchesType;
   });
@@ -201,12 +235,30 @@ export const DocumentsPage: React.FC = () => {
 
   const handleAddDocument = () => {
     setIsEditing(false);
+    setEditingDocument(null); // Сбрасываем данные редактирования
     setDialogOpen(true);
   };
 
-  const handleEditDocument = () => {
-    setIsEditing(true);
-    setDialogOpen(true);
+  const handleEditDocument = async () => {
+    if (selectedDocument) {
+      setIsEditing(true);
+      
+      try {
+        const fullDocumentData = await documentApi.getById(selectedDocument.id);
+        
+        // Сохраняем полные данные в отдельное состояние
+        setEditingDocument(fullDocumentData);
+        
+        // Открываем диалог
+        setDialogOpen(true);
+        
+      } catch (error) {
+        // Если не удалось загрузить, используем данные из таблицы
+        setEditingDocument(selectedDocument);
+        setDialogOpen(true);
+      }
+    }
+    
     handleMenuClose();
   };
 
@@ -215,70 +267,82 @@ export const DocumentsPage: React.FC = () => {
     handleMenuClose();
   };
 
-  const handleDeleteConfirm = () => {
+  const handleDeleteConfirm = async () => {
     if (selectedDocument) {
-      setDocuments(prev => prev.filter(d => d.id !== selectedDocument.id));
+      try {
+        await documentApi.delete(selectedDocument.id);
+        setDocuments(prev => prev.filter(d => d.id !== selectedDocument.id));
+      } catch (error) {
+        console.error('❌ Ошибка при удалении документа:', error);
+      }
     }
     setDeleteDialogOpen(false);
     setSelectedDocument(null);
   };
 
-  const handleDialogSubmit = (formData: DocumentFormData) => {
-    if (isEditing && selectedDocument) {
-      // Редактирование существующего документа
-      setDocuments(prev => prev.map(d =>
-        d.id === selectedDocument.id
-          ? { ...d, ...formData }
-          : d
-      ));
-    } else {
-      // Добавление нового документа
-      const newDocument: Document = {
-        id: Math.max(...documents.map(d => d.id)) + 1,
-        ...formData,
-      };
-      setDocuments(prev => [...prev, newDocument]);
+  const handleDialogSubmit = async (formData: DocumentCreate) => {    
+    // Определяем ID документа для редактирования
+    const documentId = editingDocument?.id || selectedDocument?.id;
+    
+    try {
+      if (isEditing && documentId) {
+        
+        // Преобразуем DocumentCreate в DocumentUpdate
+        const updateData: DocumentUpdate = {
+          number: formData.number,
+          date: formData.date,
+          comment: formData.comment,
+          company_id: formData.company_id,
+          document_type_id: formData.document_type_id,
+        };
+        
+        const updatedDoc = await documentApi.update(documentId, updateData);
+        
+        // Обновляем локальное состояние
+        setDocuments(prev => prev.map(d => 
+          d.id === documentId ? updatedDoc : d
+        ));
+        
+      } else {
+        const newDocument = await documentApi.create(formData);
+        setDocuments(prev => [...prev, newDocument]);
+      }
+      
+      // Закрываем диалог и сбрасываем состояния
+      setDialogOpen(false);
+      setEditingDocument(null);
+      setSelectedDocument(null);
+      
+    } catch (error: any) {
+      console.error('Ошибка при сохранении документа:', error);
     }
   };
 
   const handleCategoryClick = (category: string) => {
-    // Сопоставление названия категории с типом документа
-    const typeMap: Record<string, string> = {
-      'Приходные накладные': 'приходная',
-      'Расходные накладные': 'расходная',
-      'Акты инвентаризации': 'инвентаризация',
-      'Акты списания': 'списание',
-      'Заявки на перемещение': 'перемещение',
-      'Отчёты': 'Отчёты',
-    };
-
-    const mappedType = typeMap[category];
-    if (selectedType === mappedType) {
-      setSelectedType(null); // Снять фильтр при повторном клике
-    } else {
-      setSelectedType(mappedType);
+    // Находим тип документа по имени
+    const foundType = documentTypes.find(type => type.name === category);
+    
+    if (foundType) {
+      if (selectedTypeId === foundType.id) {
+        setSelectedTypeId(null); // Снять фильтр при повторном клике
+      } else {
+        setSelectedTypeId(foundType.id); // Установить фильтр по ID
+      }
+      setPage(0);
     }
-    setPage(0);
   };
 
   // Обработчик двойного клика по строке таблицы
-  const handleRowDoubleClick = (document: Document) => {
-    if (document.тип !== 'отчёт') { // Отчеты не заполняются
+  const handleRowDoubleClick = async (document: Document) => {
+    try {
+      // Загружаем полные данные
+      const fullDocumentData = await documentApi.getById(document.id);
+      setSelectedDocument(fullDocumentData);
+    } catch (error) {
       setSelectedDocument(document);
-      setFillDialogOpen(true);
     }
-  };
-
-  // Функция сохранения заполненного документа
-  const handleSaveFilledDocument = (updatedDocument: Document) => {
-    setDocuments(prev => prev.map(d =>
-      d.id === updatedDocument.id ? updatedDocument : d
-    ));
-  };
-
-  // Функция для получения количества строк в документе
-  const getDocumentLinesCount = (document: Document) => {
-    return document.строки ? document.строки.length : 0;
+    
+    setFillDialogOpen(true);
   };
 
   return (
@@ -381,61 +445,63 @@ export const DocumentsPage: React.FC = () => {
               <TableBody>
                 {filteredDocuments
                   .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
-                  .map((document) => (
-                    <TableRow
-                      key={document.id}
-                      hover
-                      sx={{ 
-                        cursor: document.тип !== 'отчёт' ? 'pointer' : 'default',
-                        '&:hover': { backgroundColor: 'action.hover' }
-                      }}
-                      onDoubleClick={() => handleRowDoubleClick(document)}
-                    >
-                      <TableCell>
-                        <Typography variant="body2" fontWeight={600}>
-                          {document.номер}
-                        </Typography>
-                      </TableCell>
-                      <TableCell>
-                        <Typography variant="body2">
-                          {document.дата}
-                        </Typography>
-                      </TableCell>
-                      <TableCell>
-                        <DocumentTypeChip type={document.тип} />
-                      </TableCell>
-                      <TableCell>
-                        <Typography variant="body2" align="center">
-                          {getDocumentLinesCount(document)}
-                        </Typography>
-                      </TableCell>
-                      <TableCell>
-                        <Typography variant="body2" color="text.secondary">
-                          {document.тип === 'приходная' && document.поставщик && (
-                            <Typography variant="caption" color="primary" fontWeight={600}>
-                              Поставщик: {document.поставщик}
-                              <br />
-                            </Typography>
-                          )}
-                          {document.комментарий}
-                        </Typography>
-                        {document.строки && document.строки.length > 0 && (
-                          <Typography variant="caption" color="text.secondary" display="block">
-                            Товаров: {document.строки.length} | 
-                            Общее кол-во: {document.строки.reduce((sum, line) => sum + line.количество, 0)}
+                  .map((document) => {
+                    // Находим компанию по ID
+                    const company = companies.find(c => c.id === document.company_id);
+                    
+                    return (
+                      <TableRow
+                        key={document.id}
+                        hover
+                        sx={{ 
+                          cursor: document.document_type_id !== 6 ? 'pointer' : 'default',
+                          '&:hover': { backgroundColor: 'action.hover' }
+                        }}
+                        onDoubleClick={() => handleRowDoubleClick(document)}
+                      >
+                        <TableCell>
+                          <Typography variant="body2" fontWeight={600}>
+                            {document.number}
                           </Typography>
-                        )}
-                      </TableCell>
-                      <TableCell align="right">
-                        <IconButton
-                          size="small"
-                          onClick={(e) => handleMenuOpen(e, document)}
-                        >
-                          <MoreVert />
-                        </IconButton>
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                        </TableCell>
+                        <TableCell>
+                          <Typography variant="body2">
+                            {document.date}
+                          </Typography>
+                        </TableCell>
+                        <TableCell>
+                          <DocumentTypeChip
+                            typeId={document.document_type_id}
+                            documentTypes={documentTypes}
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Typography variant="body2" align="center">
+                            {/* {getDocumentLinesCount(document)} */}
+                          </Typography>
+                        </TableCell>
+                        <TableCell>
+                          <Typography variant="body2" color="text.secondary">
+                            {document.document_type_id === 1 && company && (
+                              <Typography variant="caption" color="primary" fontWeight={600}>
+                                Поставщик: {company.name}
+                                <br />
+                              </Typography>
+                            )}
+                            {document.comment}
+                          </Typography>
+                        </TableCell>
+                        <TableCell align="right">
+                          <IconButton
+                            size="small"
+                            onClick={(e) => handleMenuOpen(e, document)}
+                          >
+                            <MoreVert />
+                          </IconButton>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
               </TableBody>
             </Table>
           </TableContainer>
@@ -465,30 +531,8 @@ export const DocumentsPage: React.FC = () => {
             <ListItemIcon>
               <Edit fontSize="small" />
             </ListItemIcon>
-            <ListItemText>Редактировать документ</ListItemText>
+            <ListItemText>Редактировать</ListItemText>
           </MenuItem>
-          {selectedDocument?.тип === 'отчёт' && (
-            <MenuItem onClick={() => {
-              console.log('Скачать отчет:', selectedDocument);
-              handleMenuClose();
-            }}>
-              <ListItemIcon>
-                <Download fontSize="small" />
-              </ListItemIcon>
-              <ListItemText>Скачать PDF</ListItemText>
-            </MenuItem>
-          )}
-          {selectedDocument?.тип === 'отчёт' && (
-            <MenuItem onClick={() => {
-              console.log('Печать отчета:', selectedDocument);
-              handleMenuClose();
-            }}>
-              <ListItemIcon>
-                <Print fontSize="small" />
-              </ListItemIcon>
-              <ListItemText>Распечатать</ListItemText>
-            </MenuItem>
-          )}
           <MenuItem onClick={handleDeleteClick}>
             <ListItemIcon>
               <Delete fontSize="small" />
@@ -500,15 +544,20 @@ export const DocumentsPage: React.FC = () => {
         {/* Диалог добавления/редактирования */}
         <DocumentAddDialog
           open={dialogOpen}
-          onClose={() => setDialogOpen(false)}
+          onClose={() => {
+            setDialogOpen(false);
+            setEditingDocument(null);
+            setSelectedDocument(null);
+          }}
           onSubmit={handleDialogSubmit}
-          initialData={selectedDocument || undefined}
+          initialData={editingDocument || selectedDocument || undefined}
           isEdit={isEditing}
-          suppliers={mockSuppliers} // Передаем список поставщиков
+          suppliers={companies}
+          documentTypes={documentTypes}
         />
 
         {/* Диалог заполнения документа */}
-        {selectedDocument && (
+        {/* {selectedDocument && (
           <DocumentLineDialog
             open={fillDialogOpen}
             onClose={() => {
@@ -516,10 +565,9 @@ export const DocumentsPage: React.FC = () => {
               setSelectedDocument(null);
             }}
             document={selectedDocument}
-            products={mockProducts}
             onSave={handleSaveFilledDocument}
           />
-        )}
+        )} */}
 
         {/* Диалог подтверждения удаления */}
         <DocumentDeleteDialog

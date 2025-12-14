@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box,
   Typography,
@@ -20,15 +20,16 @@ import {
   DateRange,
   Comment,
 } from '@mui/icons-material';
-import { DocumentFormData } from './../../../pages';
+import { DocumentType, Company, Document, DocumentCreate} from './../../../pages';
 
 export interface DocumentAddDialogProps {
   open: boolean;
   onClose: () => void;
-  onSubmit: (data: DocumentFormData) => void;
-  initialData?: DocumentFormData;
+  onSubmit: (data: DocumentCreate) => void;
+  initialData?: Document; 
   isEdit?: boolean;
-  suppliers?: string[];
+  suppliers?: Company[];
+  documentTypes: DocumentType[];
 }
 
 export const DocumentAddDialog: React.FC<DocumentAddDialogProps> = ({
@@ -38,26 +39,73 @@ export const DocumentAddDialog: React.FC<DocumentAddDialogProps> = ({
   initialData,
   isEdit = false,
   suppliers = [],
+  documentTypes,
 }) => {
-  const [formData, setFormData] = useState<DocumentFormData>(
-    initialData || {
-      номер: '',
-      дата: new Date().toLocaleDateString('ru-RU'),
-      комментарий: '',
-      тип: 'приходная',
-      поставщик: '',
+  // Инициализация формы
+  type FormData = Omit<DocumentCreate, 'comment'> & {
+    comment?: string;
+  };
+
+  const [formData, setFormData] = useState<FormData>({
+    number: '',
+    date: new Date().toISOString().split('T')[0],
+    comment: '',
+    company_id: undefined,
+    document_type_id: documentTypes[0]?.id || 1,
+  });
+
+  const [selectedSupplier, setSelectedSupplier] = useState<Company | null>(null);
+
+  // Эффект для обновления формы
+  useEffect(() => {
+    if (initialData && open) {
+      setFormData({
+        number: initialData.number || '',
+        date: initialData.date || new Date().toISOString().split('T')[0],
+        comment: initialData.comment || '',
+        company_id: initialData.company_id,
+        document_type_id: initialData.document_type_id || documentTypes[0]?.id || 1,
+      });
+
+      // Находим поставщика по ID
+      if (initialData.company_id && suppliers.length > 0) {
+        const supplier = suppliers.find(s => s.id === initialData.company_id);
+        setSelectedSupplier(supplier || null);
+      } else {
+        setSelectedSupplier(null);
+      }
+    } else if (!initialData && open) {
+      // Сброс формы для создания нового документа
+      setFormData({
+        number: '',
+        date: new Date().toISOString().split('T')[0],
+        comment: '',
+        company_id: undefined,
+        document_type_id: documentTypes[0]?.id || 1,
+      });
+      setSelectedSupplier(null);
     }
-  );
+  }, [initialData, suppliers, documentTypes, open]);
 
-  const [supplierInput, setSupplierInput] = useState<string>('');
-
-  const handleChange = (field: keyof DocumentFormData, value: string) => {
+  const handleChange = (field: keyof DocumentCreate, value: string | number | undefined) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
+  const handleSupplierChange = (newValue: Company | null) => {
+    setSelectedSupplier(newValue);
+    handleChange('company_id', newValue?.id);
+  };
+
   const handleSubmit = () => {
-    onSubmit(formData);
-    onClose();
+    const formattedData: DocumentCreate = {
+      number: formData.number,
+      date: formData.date || new Date().toISOString().split('T')[0],
+      comment: formData.comment?.trim() || undefined,
+      company_id: formData.company_id,
+      document_type_id: formData.document_type_id,
+    };
+    
+    onSubmit(formattedData);
   };
 
   return (
@@ -74,8 +122,8 @@ export const DocumentAddDialog: React.FC<DocumentAddDialogProps> = ({
           <Box sx={{ display: 'flex', gap: 2 }}>
             <TextField
               label="Номер документа"
-              value={formData.номер}
-              onChange={(e) => handleChange('номер', e.target.value)}
+              value={formData.number}
+              onChange={(e) => handleChange('number', e.target.value)}
               fullWidth
               required
               InputProps={{
@@ -88,9 +136,13 @@ export const DocumentAddDialog: React.FC<DocumentAddDialogProps> = ({
             />
             <TextField
               label="Дата"
-              value={formData.дата}
-              onChange={(e) => handleChange('дата', e.target.value)}
+              type="date"
+              value={formData.date}
+              onChange={(e) => handleChange('date', e.target.value)}
               fullWidth
+              InputLabelProps={{
+                shrink: true,
+              }}
               InputProps={{
                 startAdornment: (
                   <InputAdornment position="start">
@@ -98,77 +150,61 @@ export const DocumentAddDialog: React.FC<DocumentAddDialogProps> = ({
                   </InputAdornment>
                 ),
               }}
-              placeholder="дд.мм.гггг"
             />
           </Box>
 
-          {/* Тип документа */}
+          {/* Тип документа из БД */}
           <FormControl fullWidth>
             <InputLabel>Тип документа</InputLabel>
             <Select
-              value={formData.тип}
+              value={formData.document_type_id}
               label="Тип документа"
-              onChange={(e) => handleChange('тип', e.target.value)}
+              onChange={(e) => handleChange('document_type_id', Number(e.target.value))}
             >
-              <MenuItem value="приходная">Приходная накладная</MenuItem>
-              <MenuItem value="расходная">Расходная накладная</MenuItem>
-              <MenuItem value="инвентаризация">Акт инвентаризации</MenuItem>
-              <MenuItem value="списание">Акт списания</MenuItem>
-              <MenuItem value="перемещение">Заявка на перемещение</MenuItem>
-              <MenuItem value="отчёт">Отчёт</MenuItem>
+              {documentTypes.map((type) => (
+                <MenuItem key={type.id} value={type.id}>
+                  {type.name}
+                </MenuItem>
+              ))}
             </Select>
           </FormControl>
 
-          {/* Поле поставщика (только для приходных накладных) */}
-          {formData.тип === 'приходная' && (
-            <>
-              <Autocomplete
-                freeSolo
-                options={suppliers}
-                value={formData.поставщик || ''}
-                inputValue={supplierInput}
-                onInputChange={(event, newInputValue) => {
-                  setSupplierInput(newInputValue);
-                }}
-                onChange={(event, newValue) => {
-                  handleChange('поставщик', newValue || '');
-                }}
-                renderInput={(params) => (
-                  <TextField
-                    {...params}
-                    label="Поставщик"
-                    placeholder="Начните вводить или выберите из списка"
-                    fullWidth
-                  />
-                )}
-                renderOption={(props, option) => (
-                  <li {...props}>
-                    <Typography variant="body2">{option}</Typography>
+          {/* Поле поставщика (только для приходных документов) */}
+          {formData.document_type_id === 1 && suppliers.length > 0 && (
+            <Autocomplete
+              options={suppliers}
+              value={selectedSupplier}
+              onChange={(event, newValue) => handleSupplierChange(newValue)}
+              getOptionLabel={(option) => option.name}
+              isOptionEqualToValue={(option, value) => option.id === value?.id}
+              renderInput={(params) => (
+                <TextField
+                  {...params}
+                  label="Поставщик"
+                  placeholder="Выберите поставщика"
+                  fullWidth
+                />
+              )}
+              renderOption={(props, option) => {
+                // Извлекаем key из props и используем его отдельно
+                const { key, ...restProps } = props;
+                return (
+                  <li key={key} {...restProps}>
+                    <Typography variant="body2">{option.name}</Typography>
                   </li>
-                )}
-                filterOptions={(options, state) => {
-                  const inputValue = state.inputValue.toLowerCase();
-                  return options.filter(option =>
-                    option.toLowerCase().includes(inputValue)
-                  );
-                }}
-                sx={{
-                  '& .MuiAutocomplete-popupIndicator': {
-                    color: 'primary.main',
-                  }
-                }}
-              />
-            </>
+                );
+              }}
+            />
           )}
 
           {/* Комментарий */}
           <TextField
             label="Комментарий"
-            value={formData.комментарий}
-            onChange={(e) => handleChange('комментарий', e.target.value)}
+            value={formData.comment || ''}
+            onChange={(e) => handleChange('comment', e.target.value)}
             fullWidth
             multiline
-            rows={formData.тип === 'приходная' ? 2 : 3}
+            rows={formData.document_type_id === 1 ? 2 : 3}
             InputProps={{
               startAdornment: (
                 <InputAdornment position="start">
@@ -176,14 +212,18 @@ export const DocumentAddDialog: React.FC<DocumentAddDialogProps> = ({
                 </InputAdornment>
               ),
             }}
-            disabled={formData.тип === 'отчёт'}
-            placeholder={'Введите комментарий'}
+            placeholder="Введите комментарий"
           />
         </Box>
       </DialogContent>
       <DialogActions>
         <Button onClick={onClose}>Отмена</Button>
-        <Button onClick={handleSubmit} variant="contained" color="primary">
+        <Button 
+          onClick={handleSubmit} 
+          variant="contained" 
+          color="primary"
+          disabled={!formData.number || !formData.document_type_id || (formData.document_type_id === 1 && !formData.company_id)}
+        >
           {isEdit ? 'Сохранить' : 'Добавить'}
         </Button>
       </DialogActions>
