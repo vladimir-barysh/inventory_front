@@ -8,14 +8,24 @@ import {
   Alert,
   Box,
   Typography,
+  Chip,
 } from '@mui/material';
-import { Document } from './../../../pages';
+import { Company, Document, DocumentType } from '../../../pages';
+import { 
+  ShoppingCart, 
+  ArrowForward, 
+  Inventory, 
+  RemoveCircle, 
+  Assessment 
+} from '@mui/icons-material';
 
 export interface DocumentDeleteDialogProps {
   open: boolean;
   onClose: () => void;
   onConfirm: () => void;
   selectedDocument: Document | null;
+  documentTypes?: DocumentType[]; // Добавлено для отображения типа
+  companies?: Company[]; // Добавлено для отображения компании
 }
 
 export const DocumentDeleteDialog: React.FC<DocumentDeleteDialogProps> = ({
@@ -23,98 +33,141 @@ export const DocumentDeleteDialog: React.FC<DocumentDeleteDialogProps> = ({
   onClose,
   onConfirm,
   selectedDocument,
+  documentTypes = [],
+  companies = [],
 }) => {
-  const DocumentTypeChip: React.FC<{ type: Document['тип'] }> = ({ type }) => {
+  // Находим тип документа по ID
+  const getDocumentTypeConfig = (typeId: number) => {
     const typeConfig = {
-      'приходная': { 
-        bgColor: '#d4edda', 
+      1: { // Приход
+        bgColor: '#d4edda',
         color: '#155724',
-        label: 'Приходная'
+        icon: <ShoppingCart fontSize="small" />,
+        label: 'Приход'
       },
-      'расходная': { 
-        bgColor: '#f8d7da', 
+      2: { // Расход
+        bgColor: '#f8d7da',
         color: '#721c24',
-        label: 'Расходная'
+        icon: <ShoppingCart fontSize="small" />,
+        label: 'Расход'
       },
-      'инвентаризация': { 
-        bgColor: '#fff3cd', 
-        color: '#856404',
-        label: 'Инвентаризация'
-      },
-      'списание': { 
-        bgColor: '#d1ecf1', 
-        color: '#0c5460',
-        label: 'Списание'
-      },
-      'перемещение': { 
-        bgColor: '#cce5ff', 
+      3: { // Перемещение
+        bgColor: '#cce5ff',
         color: '#004085',
+        icon: <ArrowForward fontSize="small" />,
         label: 'Перемещение'
       },
-      'отчёт': { 
-        bgColor: '#e6ccff', 
+      4: { // Инвентаризация
+        bgColor: '#fff3cd',
+        color: '#856404',
+        icon: <Inventory fontSize="small" />,
+        label: 'Инвентаризация'
+      },
+      5: { // Списание
+        bgColor: '#d1ecf1',
+        color: '#0c5460',
+        icon: <RemoveCircle fontSize="small" />,
+        label: 'Списание'
+      },
+      6: { // Отчёт
+        bgColor: '#e6ccff',
         color: '#6610f2',
+        icon: <Assessment fontSize="small" />,
         label: 'Отчёт'
       },
     };
 
-    const config = typeConfig[type];
-    
-    return (
-      <Box
-        component="span"
-        sx={{
-          display: 'inline-flex',
-          alignItems: 'center',
-          padding: '2px 8px',
-          borderRadius: '12px',
-          backgroundColor: config.bgColor,
-          color: config.color,
-          fontSize: '0.75rem',
-          fontWeight: 500,
-          ml: 1,
-        }}
-      >
-        {config.label}
-      </Box>
-    );
+    return typeConfig[typeId as keyof typeof typeConfig] || {
+      bgColor: '#e0e0e0',
+      color: '#424242',
+      icon: null,
+      label: 'Неизвестный тип'
+    };
   };
 
+  // Находим название типа документа
+  const getDocumentTypeName = (typeId: number) => {
+    const docType = documentTypes.find(type => type.id === typeId);
+    return docType ? docType.name : 'Неизвестный тип';
+  };
+
+  // Находим название компании
+  const getCompanyName = (companyId: number) => {
+    const company = companies.find(c => c.id === companyId);
+    return company ? company.name : 'Не указан';
+  };
+
+  if (!selectedDocument) {
+    return null;
+  }
+
+  const typeConfig = getDocumentTypeConfig(selectedDocument.document_type_id);
+  const typeName = getDocumentTypeName(selectedDocument.document_type_id);
+  const companyName = getCompanyName(selectedDocument.company_id);
+
   return (
-    <Dialog open={open} onClose={onClose}>
+    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
       <DialogTitle>Подтверждение удаления</DialogTitle>
       <DialogContent>
-        <Alert severity="warning" sx={{ mb: 2 }}>
-          Вы уверены, что хотите удалить документ "{selectedDocument?.номер}"?
+        <Alert severity="warning" sx={{ mb: 3 }}>
+          Вы уверены, что хотите удалить документ "{selectedDocument.number}"?
           Это действие нельзя отменить.
         </Alert>
-        {selectedDocument && (
-          <Box sx={{ mt: 2 }}>
-            <Typography variant="body2" color="text.secondary">
-              <strong>Тип:</strong> <DocumentTypeChip type={selectedDocument.тип} />
+        
+        <Box sx={{ mt: 1 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+            <Typography variant="subtitle1" fontWeight={600}>
+              Тип документа:
             </Typography>
-            <Typography variant="body2" color="text.secondary">
-              <strong>Дата:</strong> {selectedDocument.дата}
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              <strong>Комментарий:</strong> {selectedDocument.комментарий}
-            </Typography>
-            {selectedDocument.поставщик && selectedDocument.тип === 'приходная' && (
-              <Typography variant="body2" color="text.secondary">
-                <strong>Поставщик:</strong> {selectedDocument.поставщик}
-              </Typography>
-            )}
-            {selectedDocument.строки && selectedDocument.строки.length > 0 && (
-              <Typography variant="body2" color="text.secondary">
-                <strong>Строк товаров:</strong> {selectedDocument.строки.length}
-              </Typography>
-            )}
+            <Chip
+              icon={typeConfig.icon}
+              label={typeName}
+              size="small"
+              sx={{
+                backgroundColor: typeConfig.bgColor,
+                color: typeConfig.color,
+                fontWeight: 500,
+                ml: 2,
+              }}
+            />
           </Box>
-        )}
+          
+          <Typography variant="body2" paragraph>
+            <strong>Номер:</strong> {selectedDocument.number}
+          </Typography>
+          
+          <Typography variant="body2" paragraph>
+            <strong>Дата:</strong> {selectedDocument.date}
+          </Typography>
+          
+          {selectedDocument.comment && (
+            <Typography variant="body2" paragraph>
+              <strong>Комментарий:</strong> {selectedDocument.comment}
+            </Typography>
+          )}
+          
+          {selectedDocument.document_type_id === 1 && selectedDocument.company_id && (
+            <Typography variant="body2" paragraph>
+              <strong>Поставщик:</strong> {companyName}
+            </Typography>
+          )}
+          
+          {/* Здесь можно добавить отображение количества строк, если есть */}
+          {/* <Typography variant="body2" color="text.secondary">
+            <strong>Строк товаров:</strong> {selectedDocument.строки?.length || 0}
+          </Typography> */}
+        </Box>
       </DialogContent>
-      <DialogActions>
-        <Button onClick={onClose}>Отмена</Button>
-        <Button onClick={onConfirm} variant="contained" color="error">
+      <DialogActions sx={{ px: 3, pb: 2 }}>
+        <Button onClick={onClose} variant="outlined" sx={{ minWidth: 100 }}>
+          Отмена
+        </Button>
+        <Button 
+          onClick={onConfirm} 
+          variant="contained" 
+          color="error"
+          sx={{ minWidth: 100 }}
+        >
           Удалить
         </Button>
       </DialogActions>

@@ -200,19 +200,19 @@ export const DocumentsPage: React.FC = () => {
 
   // Фильтрация документов
   const filteredDocuments = documents.filter(document => {
-    // Находим компанию по ID
-    const company = companies.find(c => c.id === document.company_id);
-    
-    const matchesSearch =
-      document.number.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      document.comment.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      document.date.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (company && company.name.toLowerCase().includes(searchTerm.toLowerCase()));
+  // Находим компанию по ID
+  const company = companies.find(c => c.id === document.company_id);
+  
+  const matchesSearch =
+    (document.number ? document.number.toLowerCase().includes(searchTerm.toLowerCase()) : false) ||
+    (document.comment ? document.comment.toLowerCase().includes(searchTerm.toLowerCase()) : false) ||
+    (document.date ? document.date.toLowerCase().includes(searchTerm.toLowerCase()) : false) ||
+    (company && company.name ? company.name.toLowerCase().includes(searchTerm.toLowerCase()) : false);
 
-    const matchesType = !selectedTypeId || document.document_type_id === selectedTypeId;
+  const matchesType = !selectedTypeId || document.document_type_id === selectedTypeId;
 
-    return matchesSearch && matchesType;
-  });
+  return matchesSearch && matchesType;
+});
 
   const handleChangePage = (event: unknown, newPage: number) => {
     setPage(newPage);
@@ -262,22 +262,29 @@ export const DocumentsPage: React.FC = () => {
     handleMenuClose();
   };
 
+  // Автоматически закрываем меню при открытии диалога удаления
+  useEffect(() => {
+    if (deleteDialogOpen && anchorEl) {
+      setAnchorEl(null);
+    }
+  }, [deleteDialogOpen, anchorEl]);
+
   const handleDeleteClick = () => {
     setDeleteDialogOpen(true);
-    handleMenuClose();
   };
 
   const handleDeleteConfirm = async () => {
     if (selectedDocument) {
       try {
         await documentApi.delete(selectedDocument.id);
+        // Обновляем локальное состояние
         setDocuments(prev => prev.filter(d => d.id !== selectedDocument.id));
+        setDeleteDialogOpen(false);
+        setSelectedDocument(null);
       } catch (error) {
-        console.error('❌ Ошибка при удалении документа:', error);
+        console.error('Ошибка при удалении документа:', error);
       }
     }
-    setDeleteDialogOpen(false);
-    setSelectedDocument(null);
   };
 
   const handleDialogSubmit = async (formData: DocumentCreate) => {    
@@ -494,7 +501,10 @@ export const DocumentsPage: React.FC = () => {
                         <TableCell align="right">
                           <IconButton
                             size="small"
-                            onClick={(e) => handleMenuOpen(e, document)}
+                            onClick={(e) => {
+                              e.stopPropagation(); // Добавьте эту строку
+                              handleMenuOpen(e, document);
+                            }}
                           >
                             <MoreVert />
                           </IconButton>
@@ -575,6 +585,8 @@ export const DocumentsPage: React.FC = () => {
           onClose={() => setDeleteDialogOpen(false)}
           onConfirm={handleDeleteConfirm}
           selectedDocument={selectedDocument}
+          documentTypes={documentTypes} // Передаем типы документов
+          companies={companies} // Передаем компании
         />
       </Box>
     </Box>
