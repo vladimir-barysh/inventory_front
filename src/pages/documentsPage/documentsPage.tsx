@@ -1,4 +1,4 @@
-import React, { useState} from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box,
   Typography,
@@ -14,18 +14,10 @@ import {
   TableHead,
   TableRow,
   TablePagination,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  FormControl,
-  InputLabel,
-  Select,
   MenuItem,
   Menu,
   ListItemIcon,
   ListItemText,
-  Alert,
   Chip,
 } from '@mui/material';
 import {
@@ -35,25 +27,22 @@ import {
   Delete,
   MoreVert,
   Description,
-  DateRange,
-  Comment,
   Assessment,
-  Download,
-  Print,
   ShoppingCart,
   Inventory,
   RemoveCircle,
   ArrowForward,
 } from '@mui/icons-material';
-import { SecondSidebar, FillDocumentDialog } from './../../components';
-import { Document, documentsData, DocumentFormData, mockProducts } from './makeData';
+import { SecondSidebar, DocumentLineDialog, DocumentAddDialog, DocumentDeleteDialog } from './../../components';
+
+import { DocumentType, documentTypeApi, Document, documentApi, DocumentCreate, DocumentUpdate } from './makeData';
+import { Company, getCompanies } from '../../pages';
 
 // Типы для категорий документов
 interface CategoryItem {
   text: string;
   icon?: React.ReactElement;
   count?: number;
-  children?: string[];
 }
 
 interface CategorySection {
@@ -61,180 +50,62 @@ interface CategorySection {
   items: CategoryItem[];
 }
 
-// Модальное окно для добавления/редактирования документа
-interface DocumentDialogProps {
-  open: boolean;
-  onClose: () => void;
-  onSubmit: (data: DocumentFormData) => void;
-  initialData?: DocumentFormData;
-  isEdit?: boolean;
+// Компонент для отображения типа документа
+interface DocumentTypeChipProps {
+  typeId: number; // ID типа документа
+  documentTypes: DocumentType[]; // Массив типов из БД
 }
 
-const DocumentDialog: React.FC<DocumentDialogProps> = ({
-  open,
-  onClose,
-  onSubmit,
-  initialData,
-  isEdit = false,
-}) => {
-  const [formData, setFormData] = useState<DocumentFormData>(
-    initialData || {
-      номер: '',
-      дата: new Date().toLocaleDateString('ru-RU'),
-      комментарий: '',
-      тип: 'приходная',
-    }
-  );
+const DocumentTypeChip: React.FC<DocumentTypeChipProps> = ({ typeId, documentTypes }) => {
+  // Находим тип документа по ID
+  const documentType = documentTypes.find(type => type.id === typeId);
 
-  const handleChange = (field: keyof DocumentFormData, value: string) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
-  };
-
-  const handleSubmit = () => {
-    onSubmit(formData);
-    onClose();
-  };
-
-  return (
-    <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
-      <DialogTitle>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          <Description />
-          {isEdit ? 'Редактировать документ' : 'Добавить новый документ'}
-        </Box>
-      </DialogTitle>
-      <DialogContent>
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 2 }}>
-          {/* Основная информация */}
-          <Typography variant="subtitle2" color="text.secondary">
-            Основная информация
-          </Typography>
-          
-          <Box sx={{ display: 'flex', gap: 2 }}>
-            <TextField
-              label="Номер документа"
-              value={formData.номер}
-              onChange={(e) => handleChange('номер', e.target.value)}
-              fullWidth
-              required
-              InputProps={{
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <Description fontSize="small" />
-                  </InputAdornment>
-                ),
-              }}
-            />
-            <TextField
-              label="Дата"
-              value={formData.дата}
-              onChange={(e) => handleChange('дата', e.target.value)}
-              fullWidth
-              InputProps={{
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <DateRange fontSize="small" />
-                  </InputAdornment>
-                ),
-              }}
-              placeholder="дд.мм.гггг"
-            />
-          </Box>
-
-          {/* Тип документа */}
-          <Typography variant="subtitle2" color="text.secondary">
-            Тип документа
-          </Typography>
-          <FormControl fullWidth>
-            <InputLabel>Тип документа</InputLabel>
-            <Select
-              value={formData.тип}
-              label="Тип документа"
-              onChange={(e) => handleChange('тип', e.target.value)}
-            >
-              <MenuItem value="приходная">Приходная накладная</MenuItem>
-              <MenuItem value="расходная">Расходная накладная</MenuItem>
-              <MenuItem value="инвентаризация">Акт инвентаризации</MenuItem>
-              <MenuItem value="списание">Акт списания</MenuItem>
-              <MenuItem value="перемещение">Заявка на перемещение</MenuItem>
-              <MenuItem value="отчёт">Отчёт</MenuItem>
-            </Select>
-          </FormControl>
-
-          {/* Комментарий */}
-          <Typography variant="subtitle2" color="text.secondary">
-            Комментарий {formData.тип === 'отчёт' && '(автозаполнен из типа отчёта)'}
-          </Typography>
-          <TextField
-            label="Комментарий"
-            value={formData.комментарий}
-            onChange={(e) => handleChange('комментарий', e.target.value)}
-            fullWidth
-            multiline
-            rows={3}
-            InputProps={{
-              startAdornment: (
-                <InputAdornment position="start">
-                  <Comment fontSize="small" />
-                </InputAdornment>
-              ),
-            }}
-            disabled={formData.тип === 'отчёт'}
-          />
-        </Box>
-      </DialogContent>
-      <DialogActions>
-        <Button onClick={onClose}>Отмена</Button>
-        <Button onClick={handleSubmit} variant="contained" color="primary">
-          {isEdit ? 'Сохранить' : 'Добавить'}
-        </Button>
-      </DialogActions>
-    </Dialog>
-  );
-};
-
-// Компонент для отображения типа документа
-const DocumentTypeChip: React.FC<{ type: Document['тип']}> = ({ type}) => {
+  // Конфигурация для каждого типа
   const typeConfig = {
-    'приходная': { 
-      bgColor: '#d4edda', 
+    1: { // Приход (ID: 1)
+      bgColor: '#d4edda',
       color: '#155724',
       icon: <ShoppingCart fontSize="small" />,
-      label: 'Приходная'
+      label: 'Приход'
     },
-    'расходная': { 
-      bgColor: '#f8d7da', 
+    2: { // Расход (ID: 2)
+      bgColor: '#f8d7da',
       color: '#721c24',
       icon: <ShoppingCart fontSize="small" />,
-      label: 'Расходная'
+      label: 'Расход'
     },
-    'инвентаризация': { 
-      bgColor: '#fff3cd', 
-      color: '#856404',
-      icon: <Inventory fontSize="small" />,
-      label: 'Инвентаризация'
-    },
-    'списание': { 
-      bgColor: '#d1ecf1', 
-      color: '#0c5460',
-      icon: <RemoveCircle fontSize="small" />,
-      label: 'Списание'
-    },
-    'перемещение': { 
-      bgColor: '#cce5ff', 
+    3: { // Перемещение (ID: 3)
+      bgColor: '#cce5ff',
       color: '#004085',
       icon: <ArrowForward fontSize="small" />,
       label: 'Перемещение'
     },
-    'отчёт': { 
-      bgColor: '#e6ccff', 
+    4: { // Инвентаризация (ID: 4)
+      bgColor: '#fff3cd',
+      color: '#856404',
+      icon: <Inventory fontSize="small" />,
+      label: 'Инвентаризация'
+    },
+    5: { // Списание (ID: 5)
+      bgColor: '#d1ecf1',
+      color: '#0c5460',
+      icon: <RemoveCircle fontSize="small" />,
+      label: 'Списание'
+    },
+    6: { // Отчёт (ID: 6)
+      bgColor: '#e6ccff',
       color: '#6610f2',
       icon: <Assessment fontSize="small" />,
       label: 'Отчёт'
     },
   };
 
-  const config = typeConfig[type];
+  const config = documentType ? typeConfig[documentType.id as keyof typeof typeConfig] : {
+    bgColor: '#e0e0e0',
+    color: '#424242',
+    icon: <Description fontSize="small" />,
+    label: 'Неизвестный тип'
+  };
   
   return (
     <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
@@ -253,7 +124,6 @@ const DocumentTypeChip: React.FC<{ type: Document['тип']}> = ({ type}) => {
 };
 
 export const DocumentsPage: React.FC = () => {
-  const [documents, setDocuments] = useState<Document[]>(documentsData);
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
@@ -263,68 +133,86 @@ export const DocumentsPage: React.FC = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedType, setSelectedType] = useState<string | null>(null);
+  const [selectedTypeId, setSelectedTypeId] = useState<number | null>(null);
+
+
+  const [editingDocument, setEditingDocument] = useState<Document | null>(null);
+  const [documents, setDocuments] = useState<Document[]>([]);
+  const [documentTypes, setDocumentTypes] = useState<DocumentType[]>([]);       // Типы документов из бд
+  const [companies, setCompanies] = useState<Company[]>([]);
+  const [loading, setLoading] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    // Первоначальная загрузка
+    loadAllData();
+    
+    // Настраиваем интервал для обновления каждые 10 секунд, НО ТОЛЬКО ЕСЛИ НЕ РЕДАКТИРУЕМ/НЕ ДОБАВЛЯЕМ
+    const intervalId = setInterval(() => {
+      if (!dialogOpen && !fillDialogOpen && !deleteDialogOpen) {
+        console.log('Автоматическое обновление данных...');
+        loadAllData();
+      } else {
+        console.log('Пропускаем автообновление: открыт диалог');
+      }
+    }, 10000);
+    
+    return () => {
+      clearInterval(intervalId);
+      console.log('Интервал очищен');
+    };
+  }, [dialogOpen, fillDialogOpen, deleteDialogOpen]);
+
+  const loadAllData = async () => {
+    setLoading(true);
+    setError(null);
+    
+    try {
+      // Загружаем все данные параллельно
+      const [types, docs, comps] = await Promise.all([
+        documentTypeApi.getAll(),
+        documentApi.getAll(),
+        getCompanies()
+      ]);
+      
+      setDocumentTypes(types);
+      setDocuments(docs);
+      setCompanies(comps);
+    } catch (err) {
+      setError('Не удалось загрузить данные');
+      console.error('Ошибка загрузки данных:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Категории для сайдбара
   const categorySections: CategorySection[] = [
     {
-      title: 'Входные документы',
-      items: [
-        {
-          text: 'Приходные накладные',
-          icon: <Description />,
-          count: documents.filter(d => d.тип === 'приходная').length,
-        },
-        {
-          text: 'Расходные накладные',
-          icon: <Description />,
-          count: documents.filter(d => d.тип === 'расходная').length,
-        },
-        {
-          text: 'Акты инвентаризации',
-          icon: <Description />,
-          count: documents.filter(d => d.тип === 'инвентаризация').length,
-        },
-        {
-          text: 'Акты списания',
-          icon: <Description />,
-          count: documents.filter(d => d.тип === 'списание').length,
-        },
-        {
-          text: 'Заявки на перемещение',
-          icon: <Description />,
-          count: documents.filter(d => d.тип === 'перемещение').length,
-        },
-        {
-          text: 'Отчёты',
-          icon: <Description />,
-          count: documents.filter(d => d.тип === 'отчёт').length,
-          children: [
-            'Остатки товаров на складе', 
-            'Движение товаров', 
-            'Товары с истекающим сроком годности'
-          ],
-        },
-      ],
+      title: 'Типы документов',
+      items: documentTypes.map(type => ({
+        text: type.name,
+        icon: <Description />,
+        count: documents.filter(d => d.document_type_id === type.id).length,
+      })),
     },
   ];
 
   // Фильтрация документов
   const filteredDocuments = documents.filter(document => {
-    const matchesSearch =
-      document.номер.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      document.комментарий.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (document.строки && document.строки.some(line => 
-        line.наименование.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        line.артикул.toLowerCase().includes(searchTerm.toLowerCase())
-      ));
+  // Находим компанию по ID
+  const company = companies.find(c => c.id === document.company_id);
+  
+  const matchesSearch =
+    (document.number ? document.number.toLowerCase().includes(searchTerm.toLowerCase()) : false) ||
+    (document.comment ? document.comment.toLowerCase().includes(searchTerm.toLowerCase()) : false) ||
+    (document.date ? document.date.toLowerCase().includes(searchTerm.toLowerCase()) : false) ||
+    (company && company.name ? company.name.toLowerCase().includes(searchTerm.toLowerCase()) : false);
 
-    const matchesType = !selectedType || 
-      (selectedType === 'Отчёты' && document.тип === 'отчёт') ||
-      (document.тип === selectedType);
+  const matchesType = !selectedTypeId || document.document_type_id === selectedTypeId;
 
-    return matchesSearch && matchesType;
-  });
+  return matchesSearch && matchesType;
+});
 
   const handleChangePage = (event: unknown, newPage: number) => {
     setPage(newPage);
@@ -347,112 +235,121 @@ export const DocumentsPage: React.FC = () => {
 
   const handleAddDocument = () => {
     setIsEditing(false);
+    setEditingDocument(null); // Сбрасываем данные редактирования
     setDialogOpen(true);
   };
 
-  const handleEditDocument = () => {
-    setIsEditing(true);
-    setDialogOpen(true);
+  const handleEditDocument = async () => {
+    if (selectedDocument) {
+      setIsEditing(true);
+      
+      try {
+        const fullDocumentData = await documentApi.getById(selectedDocument.id);
+        
+        // Сохраняем полные данные в отдельное состояние
+        setEditingDocument(fullDocumentData);
+        
+        // Открываем диалог
+        setDialogOpen(true);
+        
+      } catch (error) {
+        // Если не удалось загрузить, используем данные из таблицы
+        setEditingDocument(selectedDocument);
+        setDialogOpen(true);
+      }
+    }
+    
     handleMenuClose();
   };
+
+  // Автоматически закрываем меню при открытии диалога удаления
+  useEffect(() => {
+    if (deleteDialogOpen && anchorEl) {
+      setAnchorEl(null);
+    }
+  }, [deleteDialogOpen, anchorEl]);
 
   const handleDeleteClick = () => {
     setDeleteDialogOpen(true);
-    handleMenuClose();
   };
 
-  const handleDeleteConfirm = () => {
+  const handleDeleteConfirm = async () => {
     if (selectedDocument) {
-      setDocuments(prev => prev.filter(d => d.id !== selectedDocument.id));
+      try {
+        await documentApi.delete(selectedDocument.id);
+        // Обновляем локальное состояние
+        setDocuments(prev => prev.filter(d => d.id !== selectedDocument.id));
+        setDeleteDialogOpen(false);
+        setSelectedDocument(null);
+      } catch (error) {
+        console.error('Ошибка при удалении документа:', error);
+      }
     }
-    setDeleteDialogOpen(false);
-    setSelectedDocument(null);
   };
 
-  const handleDialogSubmit = (formData: DocumentFormData) => {
-    if (isEditing && selectedDocument) {
-      // Редактирование существующего документа
-      setDocuments(prev => prev.map(d =>
-        d.id === selectedDocument.id
-          ? { ...d, ...formData }
-          : d
-      ));
-    } else {
-      // Добавление нового документа
-      const newDocument: Document = {
-        id: Math.max(...documents.map(d => d.id)) + 1,
-        ...formData,
-      };
-      setDocuments(prev => [...prev, newDocument]);
+  const handleDialogSubmit = async (formData: DocumentCreate) => {    
+    // Определяем ID документа для редактирования
+    const documentId = editingDocument?.id || selectedDocument?.id;
+    
+    try {
+      if (isEditing && documentId) {
+        
+        // Преобразуем DocumentCreate в DocumentUpdate
+        const updateData: DocumentUpdate = {
+          number: formData.number,
+          date: formData.date,
+          comment: formData.comment,
+          company_id: formData.company_id,
+          document_type_id: formData.document_type_id,
+        };
+        
+        const updatedDoc = await documentApi.update(documentId, updateData);
+        
+        // Обновляем локальное состояние
+        setDocuments(prev => prev.map(d => 
+          d.id === documentId ? updatedDoc : d
+        ));
+        
+      } else {
+        const newDocument = await documentApi.create(formData);
+        setDocuments(prev => [...prev, newDocument]);
+      }
+      
+      // Закрываем диалог и сбрасываем состояния
+      setDialogOpen(false);
+      setEditingDocument(null);
+      setSelectedDocument(null);
+      
+    } catch (error: any) {
+      console.error('Ошибка при сохранении документа:', error);
     }
   };
 
   const handleCategoryClick = (category: string) => {
-    // Сопоставление названия категории с типом документа
-    const typeMap: Record<string, string> = {
-      'Приходные накладные': 'приходная',
-      'Расходные накладные': 'расходная',
-      'Акты инвентаризации': 'инвентаризация',
-      'Акты списания': 'списание',
-      'Заявки на перемещение': 'перемещение',
-      'Отчёты': 'Отчёты', // Специальное значение для всех отчетов
-      'Остатки товаров на складе': 'отчёт',
-      'Движение товаров': 'отчёт',
-      'Товары с истекающим сроком годности': 'отчёт',
-    };
-
-    const mappedType = typeMap[category];
-    if (selectedType === mappedType) {
-      setSelectedType(null); // Снять фильтр при повторном клике
-    } else {
-      setSelectedType(mappedType);
+    // Находим тип документа по имени
+    const foundType = documentTypes.find(type => type.name === category);
+    
+    if (foundType) {
+      if (selectedTypeId === foundType.id) {
+        setSelectedTypeId(null); // Снять фильтр при повторном клике
+      } else {
+        setSelectedTypeId(foundType.id); // Установить фильтр по ID
+      }
+      setPage(0);
     }
-    setPage(0);
   };
 
   // Обработчик двойного клика по строке таблицы
-  const handleRowDoubleClick = (document: Document) => {
-    if (document.тип !== 'отчёт') { // Отчеты не заполняются
+  const handleRowDoubleClick = async (document: Document) => {
+    try {
+      // Загружаем полные данные
+      const fullDocumentData = await documentApi.getById(document.id);
+      setSelectedDocument(fullDocumentData);
+    } catch (error) {
       setSelectedDocument(document);
-      setFillDialogOpen(true);
     }
-  };
-
-  // Функция сохранения заполненного документа
-  const handleSaveFilledDocument = (updatedDocument: Document) => {
-    setDocuments(prev => prev.map(d =>
-      d.id === updatedDocument.id ? updatedDocument : d
-    ));
-  };
-
-  // Функция для получения количества строк в документе
-  const getDocumentLinesCount = (document: Document) => {
-    return document.строки ? document.строки.length : 0;
-  };
-
-  // Функция для получения суммы документа
-  const getDocumentTotalAmount = (document: Document) => {
-    if (!document.строки || document.строки.length === 0) return 0;
     
-    return document.строки.reduce((sum, line) => {
-      // Обрабатываем каждый тип строки по отдельности
-      switch (line.тип) {
-        case 'приходная':
-          return sum + line.сумма;
-        case 'расходная':
-          return sum + line.сумма;
-        case 'инвентаризация':
-          // Для инвентаризации используем сумму по учету
-          return sum + line.суммаПоУчету;
-        case 'перемещение':
-          // Для перемещения нет суммы, возвращаем 0
-          return sum + 0;
-        case 'списание':
-          return sum + line.сумма;
-        default:
-          return sum + 0;
-      }
-    }, 0);
+    setFillDialogOpen(true);
   };
 
   return (
@@ -483,7 +380,7 @@ export const DocumentsPage: React.FC = () => {
             }}>
               {/* Поле поиска */}
               <TextField
-                placeholder="Поиск по номеру, комментарию или товару..."
+                placeholder="Поиск по номеру, комментарию или дате"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 InputProps={{
@@ -540,81 +437,81 @@ export const DocumentsPage: React.FC = () => {
 
         {/* Таблица документов */}
         <Paper sx={{ width: '100%', overflow: 'hidden' }}>
-          <TableContainer sx={{ maxHeight: 440 }}>
+          <TableContainer sx={{ maxHeight: 550 }}>
             <Table stickyHeader>
               <TableHead>
                 <TableRow>
-                  <TableCell width="180px">Номер документа</TableCell>
+                  <TableCell width="150px">Номер документа</TableCell>
                   <TableCell width="100px">Дата</TableCell>
                   <TableCell width="140px">Тип документа</TableCell>
                   <TableCell width="80px">Строк</TableCell>
-                  <TableCell width="120px">Сумма</TableCell>
-                  <TableCell>Комментарий</TableCell>
+                  <TableCell width="300px">Комментарий</TableCell>
                   <TableCell width="80px" align="right">Действия</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
                 {filteredDocuments
                   .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
-                  .map((document) => (
-                    <TableRow
-                      key={document.id}
-                      hover
-                      sx={{ 
-                        cursor: document.тип !== 'отчёт' ? 'pointer' : 'default',
-                        '&:hover': { backgroundColor: 'action.hover' }
-                      }}
-                      onDoubleClick={() => handleRowDoubleClick(document)}
-                    >
-                      <TableCell>
-                        <Typography variant="body2" fontWeight={600}>
-                          {document.номер}
-                        </Typography>
-                        {document.тип === 'отчёт' && (
-                          <Typography variant="caption" color="text.secondary">
-                            Двойной клик не доступен
+                  .map((document) => {
+                    // Находим компанию по ID
+                    const company = companies.find(c => c.id === document.company_id);
+                    
+                    return (
+                      <TableRow
+                        key={document.id}
+                        hover
+                        sx={{ 
+                          cursor: document.document_type_id !== 6 ? 'pointer' : 'default',
+                          '&:hover': { backgroundColor: 'action.hover' }
+                        }}
+                        onDoubleClick={() => handleRowDoubleClick(document)}
+                      >
+                        <TableCell>
+                          <Typography variant="body2" fontWeight={600}>
+                            {document.number}
                           </Typography>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <Typography variant="body2">
-                          {document.дата}
-                        </Typography>
-                      </TableCell>
-                      <TableCell>
-                        <DocumentTypeChip type={document.тип} />
-                      </TableCell>
-                      <TableCell>
-                        <Typography variant="body2" align="center">
-                          {getDocumentLinesCount(document)}
-                        </Typography>
-                      </TableCell>
-                      <TableCell>
-                        <Typography variant="body2" fontWeight={600}>
-                          {getDocumentTotalAmount(document).toLocaleString('ru-RU')} ₽
-                        </Typography>
-                      </TableCell>
-                      <TableCell>
-                        <Typography variant="body2" color="text.secondary">
-                          {document.комментарий}
-                        </Typography>
-                        {document.строки && document.строки.length > 0 && (
-                          <Typography variant="caption" color="text.secondary" display="block">
-                            Товаров: {document.строки.length} | 
-                            Общее кол-во: {document.строки.reduce((sum, line) => sum + line.количество, 0)}
+                        </TableCell>
+                        <TableCell>
+                          <Typography variant="body2">
+                            {document.date}
                           </Typography>
-                        )}
-                      </TableCell>
-                      <TableCell align="right">
-                        <IconButton
-                          size="small"
-                          onClick={(e) => handleMenuOpen(e, document)}
-                        >
-                          <MoreVert />
-                        </IconButton>
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                        </TableCell>
+                        <TableCell>
+                          <DocumentTypeChip
+                            typeId={document.document_type_id}
+                            documentTypes={documentTypes}
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Typography variant="body2" align="center">
+                            {/* {getDocumentLinesCount(document)} */}
+                          </Typography>
+                        </TableCell>
+                        <TableCell>
+                          <Typography variant="body2" color="text.secondary">
+                            {document.document_type_id === 1 && company && (
+                              <Typography variant="caption" color="primary" fontWeight={600}>
+                                Поставщик: {company.name}
+                                <br />
+                              </Typography>
+                            )}
+                            {document.comment}
+                          </Typography>
+                        </TableCell>
+                        <TableCell align="right">
+                          <IconButton
+                            size="small"
+                            onClick={(e) => {
+                              e.stopPropagation(); // Добавьте эту строку
+                              handleMenuOpen(e, document);
+                            }}
+                          >
+                            <MoreVert />
+                          </IconButton>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
               </TableBody>
             </Table>
           </TableContainer>
@@ -644,41 +541,8 @@ export const DocumentsPage: React.FC = () => {
             <ListItemIcon>
               <Edit fontSize="small" />
             </ListItemIcon>
-            <ListItemText>Редактировать документ</ListItemText>
+            <ListItemText>Редактировать</ListItemText>
           </MenuItem>
-          {selectedDocument && selectedDocument.тип !== 'отчёт' && (
-            <MenuItem onClick={() => {
-              handleRowDoubleClick(selectedDocument);
-              handleMenuClose();
-            }}>
-              <ListItemIcon>
-                <Description fontSize="small" />
-              </ListItemIcon>
-              <ListItemText>Заполнить документ</ListItemText>
-            </MenuItem>
-          )}
-          {selectedDocument?.тип === 'отчёт' && (
-            <MenuItem onClick={() => {
-              console.log('Скачать отчет:', selectedDocument);
-              handleMenuClose();
-            }}>
-              <ListItemIcon>
-                <Download fontSize="small" />
-              </ListItemIcon>
-              <ListItemText>Скачать PDF</ListItemText>
-            </MenuItem>
-          )}
-          {selectedDocument?.тип === 'отчёт' && (
-            <MenuItem onClick={() => {
-              console.log('Печать отчета:', selectedDocument);
-              handleMenuClose();
-            }}>
-              <ListItemIcon>
-                <Print fontSize="small" />
-              </ListItemIcon>
-              <ListItemText>Распечатать</ListItemText>
-            </MenuItem>
-          )}
           <MenuItem onClick={handleDeleteClick}>
             <ListItemIcon>
               <Delete fontSize="small" />
@@ -688,62 +552,42 @@ export const DocumentsPage: React.FC = () => {
         </Menu>
 
         {/* Диалог добавления/редактирования */}
-        <DocumentDialog
+        <DocumentAddDialog
           open={dialogOpen}
-          onClose={() => setDialogOpen(false)}
+          onClose={() => {
+            setDialogOpen(false);
+            setEditingDocument(null);
+            setSelectedDocument(null);
+          }}
           onSubmit={handleDialogSubmit}
-          initialData={selectedDocument || undefined}
+          initialData={editingDocument || selectedDocument || undefined}
           isEdit={isEditing}
+          suppliers={companies}
+          documentTypes={documentTypes}
         />
 
         {/* Диалог заполнения документа */}
-        {selectedDocument && (
-          <FillDocumentDialog
+        {/* {selectedDocument && (
+          <DocumentLineDialog
             open={fillDialogOpen}
             onClose={() => {
               setFillDialogOpen(false);
               setSelectedDocument(null);
             }}
             document={selectedDocument}
-            products={mockProducts}
             onSave={handleSaveFilledDocument}
           />
-        )}
+        )} */}
 
         {/* Диалог подтверждения удаления */}
-        <Dialog open={deleteDialogOpen} onClose={() => setDeleteDialogOpen(false)}>
-          <DialogTitle>Подтверждение удаления</DialogTitle>
-          <DialogContent>
-            <Alert severity="warning" sx={{ mb: 2 }}>
-              Вы уверены, что хотите удалить документ "{selectedDocument?.номер}"?
-              Это действие нельзя отменить.
-            </Alert>
-            {selectedDocument && (
-              <Box sx={{ mt: 2 }}>
-                <Typography variant="body2" color="text.secondary">
-                  <strong>Тип:</strong> <DocumentTypeChip type={selectedDocument.тип} />
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  <strong>Дата:</strong> {selectedDocument.дата}
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  <strong>Комментарий:</strong> {selectedDocument.комментарий}
-                </Typography>
-                {selectedDocument.строки && selectedDocument.строки.length > 0 && (
-                  <Typography variant="body2" color="text.secondary">
-                    <strong>Строк товаров:</strong> {selectedDocument.строки.length}
-                  </Typography>
-                )}
-              </Box>
-            )}
-          </DialogContent>
-          <DialogActions>
-            <Button onClick={() => setDeleteDialogOpen(false)}>Отмена</Button>
-            <Button onClick={handleDeleteConfirm} variant="contained" color="error">
-              Удалить
-            </Button>
-          </DialogActions>
-        </Dialog>
+        <DocumentDeleteDialog
+          open={deleteDialogOpen}
+          onClose={() => setDeleteDialogOpen(false)}
+          onConfirm={handleDeleteConfirm}
+          selectedDocument={selectedDocument}
+          documentTypes={documentTypes} // Передаем типы документов
+          companies={companies} // Передаем компании
+        />
       </Box>
     </Box>
   );
