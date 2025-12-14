@@ -1,4 +1,6 @@
+import {useEffect, useState} from 'react';
 import apiClient from '../../api/axios';
+import { CircularProgress, Typography } from '@mui/material';
 
 
 // ========== ТИПЫ ==========
@@ -113,7 +115,12 @@ export const productApi ={
 
   getQuantity: async (id: number, zone?: number): Promise<number> => {
     const response = await apiClient.get(`/products/${id}/quantity`);
-    return response.data.total_quantity;  
+    return response.data;  
+  },
+
+  getFullQuantity: async (id: number): Promise<number> => {
+    const response = await apiClient.get(`/products/${id}/fullquantity`);
+    return response.data.quantity;
   },
 };
 
@@ -123,3 +130,43 @@ export const unitApi = {
     return response.data;
   }
 };
+
+interface ProductQuantityProps {
+  productId: number;
+}
+
+export const ProductQuantity: React.FC<ProductQuantityProps> = ({ productId }) => {
+  // 2. Исправляем тип useState - указываем что может быть number или string
+  const [quantity, setQuantity] = useState<number | string | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchQuantity = async () => {
+      try {
+        setLoading(true);
+        console.log('🔄 Начало загрузки для productId:', productId);
+         // Получаем объект {quantity: число}
+        const qty = await productApi.getFullQuantity(productId);
+        
+        console.log('Извлеченное количество:', qty);
+        setQuantity(qty);
+        console.log('📦 Ответ API:', qty);
+      } catch (error) {
+        console.error('Error fetching quantity:', error);
+        setQuantity('N/A');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchQuantity();
+  }, [productId]);
+
+  if (loading) {
+    return <>Загрузка</>;
+  }
+  console.log('✅ Показываем quantity:', quantity);
+  return <>{quantity}</>;
+};
+
+export default ProductQuantity;

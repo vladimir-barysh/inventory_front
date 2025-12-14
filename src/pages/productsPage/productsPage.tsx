@@ -26,7 +26,7 @@ import {
   CheckBox as CheckBoxIcon,
 } from '@mui/icons-material';
 import { SecondSidebar } from './../../components';
-import { Product, productApi, ProductFormData, categoryApi, Category, unitApi, Unit } from './makeData';
+import { Product, productApi, ProductFormData, categoryApi, Category, unitApi, Unit, ProductQuantity } from './makeData';
 
 import AdminOnly from '../../components/AdminOnly';
 
@@ -226,6 +226,7 @@ export const ProductsPage: React.FC = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [units, setUnits] = useState<Unit[]>([]);
+  const [quantity, setQuantity] = useState(null);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -254,8 +255,11 @@ export const ProductsPage: React.FC = () => {
       clearInterval(intervalId);
       console.log('Интервал очищен');
     };
+
+    
   }, []); // Пустой массив зависимостей = запуск только при монтировании
 
+  
   const loadAllData = async () => {
     setLoading(true);
     setError(null);
@@ -606,7 +610,7 @@ export const ProductsPage: React.FC = () => {
                         <TableCell>
                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                             <Typography fontWeight={500}>
-                              0
+                              <ProductQuantity productId={product.id}/>
                             </Typography>
                             <Typography variant="caption" color="text.secondary">
                               {findUnitName(product)}
