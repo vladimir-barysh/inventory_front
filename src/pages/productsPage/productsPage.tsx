@@ -404,7 +404,11 @@ export const ProductsPage: React.FC = () => {
       const categoryName = c.name;
       return categoryName === category;
     });
-    setSelectedCategory(foundCategory ? foundCategory.id : null);
+    if (selectedCategory === foundCategory?.id){
+      setSelectedCategory(null);
+    } else {
+      setSelectedCategory(foundCategory ? foundCategory.id : null);
+    }
     setPage(0);
   };
 
