@@ -8,9 +8,9 @@ export interface StorageCondition {
 
 export interface StorageZone {
   id: number;
-  наименование: string;          // name с бэка
-  условияХранения: string;       // storage_condition с бэка (строка)
-  комментарий: string;           // comment с бэка
+  наименование: string;          
+  условияХранения: string;       
+  комментарий: string;           
 }
 
 export interface StorageZoneFormData {
@@ -228,7 +228,6 @@ export const deleteStorageZoneById = async (id: number) => {
 // Конфиг для UI
 export let storageConditionsConfig: Record<string, { 
   label: string; 
-  icon: string; 
   description: string; 
   color: string;
 }> = {};
@@ -236,13 +235,11 @@ export let storageConditionsConfig: Record<string, {
 // Функция для инициализации storageConditionsConfig
 export const initStorageConditionsConfig = (conditions: StorageCondition[]) => {
   const colors = ['#e8f5e9', '#e3f2fd', '#e1f5fe', '#f3e5f5', '#fff3e0'];
-  const icons = ['🏭', '🌡️', '💦', '💨', '⚠️'];
 
   storageConditionsConfig = {};
   conditions.forEach((c, index) => {
     storageConditionsConfig[c.name] = {
       label: c.name,
-      icon: icons[index % icons.length],
       description: c.name,
       color: colors[index % colors.length],
     };

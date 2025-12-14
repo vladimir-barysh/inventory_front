@@ -61,7 +61,6 @@ import AdminOnly from '../../components/AdminOnly';
 const StorageConditionChip: React.FC<{ condition: StorageZone['условияХранения'] }> = ({ condition }) => {
   const config = storageConditionsConfig[condition] || {
     label: condition || 'Не указано',
-    icon: '🏭',
     color: '#f5f5f5',
     description: condition || 'Не указано'
   };
@@ -70,7 +69,6 @@ const StorageConditionChip: React.FC<{ condition: StorageZone['условияХ�
     <Chip
       label={
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-          <span>{config.icon}</span>
           <span>{config.label}</span>
         </Box>
       }
@@ -176,12 +174,8 @@ const StorageZoneDialog: React.FC<StorageZoneDialogProps> = ({
                 Object.entries(storageConditionsConfig).map(([key, config]) => (
                   <MenuItem key={key} value={key}>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <span>{config.icon}</span>
                       <Box>
                         <Typography>{config.label}</Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          {config.description}
-                        </Typography>
                       </Box>
                     </Box>
                   </MenuItem>
@@ -398,9 +392,6 @@ export const StoragePage: React.FC = () => {
     }
   };
 
-  const handleRefresh = () => {
-    loadData();
-  };
 
   const handleCloseSnackbar = () => {
     setSnackbar(prev => ({ ...prev, open: false }));
@@ -479,14 +470,6 @@ export const StoragePage: React.FC = () => {
             
             {/* Кнопки управления */}
             <Box sx={{ display: 'flex', gap: 1 }}>
-              <Button
-                variant="outlined"
-                startIcon={<Refresh />}
-                onClick={handleRefresh}
-                disabled={loading}
-              >
-                Обновить
-              </Button>
               <AdminOnly>
                 <Button
                   variant="contained"
@@ -627,7 +610,6 @@ export const StoragePage: React.FC = () => {
                   }}
                 >
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                    <Typography variant="h4">{config.icon || '🏭'}</Typography>
                     <Typography variant="h5" fontWeight={600}>
                       {count}
                     </Typography>

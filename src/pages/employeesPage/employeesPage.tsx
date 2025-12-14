@@ -1,5 +1,5 @@
 // src/pages/employees/EmployeesPage.tsx
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box,
   Typography,
@@ -43,32 +43,41 @@ import {
   Delete as DeleteIcon,
 } from '@mui/icons-material';
 import { 
+  API_BASE,
   Employee, 
-  employeesData, 
   EmployeeFormData,
+  getEmployees,
+  initPositionConfig,
+  initDepartmentConfig,
+  initRoleConfig,
+  getPositions,
+  getSubdivisions,
+  mapEmployees,
+  getRoles, 
+  postEmployee,
+  buildIdNameMap,
   roleConfig,
   departmentConfig,
+  positionConfig,
+  Position,
+  Subdivision,
+  Role,
 } from './makeData';
-
-
 import AdminOnly from '../../components/AdminOnly';
 
 // Компонент для отображения роли
-const RoleChip: React.FC<{ role: Employee['роль'] }> = ({ role }) => {
+const RoleChip: React.FC<{ role: string }> = ({ role }) => {
   const config = roleConfig[role];
-  
+  console.log('RoleChip render', role, roleConfig[role]);
+
+
   return (
     <Chip
-      label={
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-          <span>{config.icon}</span>
-          <span>{config.label}</span>
-        </Box>
-      }
+      label={config?.label ?? role}
       size="small"
       sx={{
-        backgroundColor: config.bgColor,
-        color: config.color,
+        backgroundColor: config?.bgColor ?? '#eee',
+        color: config?.color ?? '#555',
         fontWeight: 500,
       }}
     />
@@ -76,26 +85,39 @@ const RoleChip: React.FC<{ role: Employee['роль'] }> = ({ role }) => {
 };
 
 // Компонент для отображения подразделения
-const DepartmentChip: React.FC<{ department: Employee['подразделение'] }> = ({ department }) => {
+const DepartmentChip: React.FC<{ department: string }> = ({ department }) => {
   const config = departmentConfig[department];
-  
+
   return (
     <Chip
-      label={
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-          <span>{config.icon}</span>
-          <span>{config.label}</span>
-        </Box>
-      }
+      label={config?.label ?? department}
       size="small"
       sx={{
-        backgroundColor: config.bgColor,
-        color: config.color,
+        backgroundColor: config?.bgColor ?? '#eee',
+        color: config?.color ?? '#555',
         fontWeight: 500,
       }}
     />
   );
 };
+
+// Компонент для отображения должности
+const PositionChip: React.FC<{ position: string }> = ({ position }) => {
+  const config = positionConfig[position];
+
+  return (
+    <Chip
+      label={config?.label ?? position}
+      size="small"
+      sx={{
+        backgroundColor: config?.bgColor ?? '#eee',
+        color: config?.color ?? '#555',
+        fontWeight: 500,
+      }}
+    />
+  );
+};
+
 
 // Модальное окно для добавления/редактирования сотрудника
 interface EmployeeDialogProps {
@@ -104,6 +126,9 @@ interface EmployeeDialogProps {
   onSubmit: (data: EmployeeFormData) => void;
   initialData?: EmployeeFormData;
   isEdit?: boolean;
+  positionsList: Position[]; 
+  subdivisionsList: Subdivision[];
+  rolesList: Role[];
 }
 
 const EmployeeDialog: React.FC<EmployeeDialogProps> = ({ 
@@ -111,31 +136,68 @@ const EmployeeDialog: React.FC<EmployeeDialogProps> = ({
   onClose, 
   onSubmit, 
   initialData,
-  isEdit = false 
+  isEdit = false,
+  positionsList,
+  subdivisionsList,
+  rolesList
 }) => {
   const [formData, setFormData] = useState<EmployeeFormData>(
     initialData || {
       фамилия: '',
       имя: '',
-      отчество: '',
       email: '',
       телефон: '',
       серияПаспорта: '',
       номерПаспорта: '',
       датаРождения: '',
-      роль: 'кладовщик',
+      роль: '',
       должность: '',
-      подразделение: 'склад',
+      подразделение: '',
     }
   );
+  const [errors, setErrors] = useState<Partial<Record<keyof EmployeeFormData, string>>>({});
 
-  const handleChange = (field: keyof EmployeeFormData, value: string) => {
+  const validateForm = (): boolean => {
+    const newErrors: Partial<Record<keyof EmployeeFormData, string>> = {};
+
+    if (!formData.фамилия.trim()) newErrors.фамилия = 'Обязательное поле';
+    if (!formData.имя.trim()) newErrors.имя = 'Обязательное поле';
+    if (!formData.email.trim()) newErrors.email = 'Обязательное поле';
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) newErrors.email = 'Некорректный email';
+    
+    if (!formData.телефон.trim()) newErrors.телефон = 'Обязательное поле';
+    else if (!/^[\d+\-\s()]+$/.test(formData.телефон)) newErrors.телефон = 'Некорректный телефон';
+    
+    if (!formData.серияПаспорта.trim()) newErrors.серияПаспорта = 'Обязательное поле';
+    else if (!/^\d{4}$/.test(formData.серияПаспорта)) newErrors.серияПаспорта = '4 цифры';
+    
+    if (!formData.номерПаспорта.trim()) newErrors.номерПаспорта = 'Обязательное поле';
+    else if (!/^\d{6}$/.test(formData.номерПаспорта)) newErrors.номерПаспорта = '6 цифр';
+    
+    if (!formData.датаРождения.trim()) newErrors.датаРождения = 'Обязательное поле';
+    else if (!/^\d{2}\.\d{2}\.\d{4}$/.test(formData.датаРождения)) newErrors.датаРождения = 'Формат: дд.мм.гггг';
+    
+    if (!formData.роль) newErrors.роль = 'Обязательное поле';
+    if (!formData.должность) newErrors.должность = 'Обязательное поле';
+    if (!formData.подразделение) newErrors.подразделение = 'Обязательное поле';
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+   const handleChange = (field: keyof EmployeeFormData, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
+    // Очищаем ошибку при изменении поля
+    if (errors[field]) {
+      setErrors(prev => ({ ...prev, [field]: undefined }));
+    }
   };
 
   const handleSubmit = () => {
-    onSubmit(formData);
-    onClose();
+    if (validateForm()) {
+      onSubmit(formData);
+      onClose();
+    }
   };
 
   return (
@@ -147,156 +209,168 @@ const EmployeeDialog: React.FC<EmployeeDialogProps> = ({
         </Box>
       </DialogTitle>
       <DialogContent>
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 2 }}>
-          Личные данные
-            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(3, 1fr)' }, gap: 2 }}>
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, pt: 2 }}>
+          <Typography variant="subtitle1" fontWeight={600}>Личные данные</Typography>
+          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)' }, gap: 2 }}>
             <TextField
-                label="Фамилия"
-                value={formData.фамилия}
-                onChange={(e) => handleChange('фамилия', e.target.value)}
-                fullWidth
-                required
-                InputProps={{
+              label="Фамилия *"
+              value={formData.фамилия}
+              onChange={(e) => handleChange('фамилия', e.target.value)}
+              fullWidth
+              required
+              error={!!errors.фамилия}
+              helperText={errors.фамилия}
+              InputProps={{
                 startAdornment: (
-                    <InputAdornment position="start">
+                  <InputAdornment position="start">
                     <Person fontSize="small" />
-                    </InputAdornment>
+                  </InputAdornment>
                 ),
-                }}
+              }}
             />
             <TextField
-                label="Имя"
-                value={formData.имя}
-                onChange={(e) => handleChange('имя', e.target.value)}
-                fullWidth
-                required
+              label="Имя *"
+              value={formData.имя}
+              onChange={(e) => handleChange('имя', e.target.value)}
+              fullWidth
+              required
+              error={!!errors.имя}
+              helperText={errors.имя}
             />
+          </Box>
+          
+          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(3, 1fr)' }, gap: 2 }}>
             <TextField
-                label="Отчество"
-                value={formData.отчество}
-                onChange={(e) => handleChange('отчество', e.target.value)}
-                fullWidth
-            />
-            </Box>
-            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(3, 1fr)' }, gap: 2 }}>
-            <TextField
-                label="Серия паспорта"
-                value={formData.серияПаспорта}
-                onChange={(e) => handleChange('серияПаспорта', e.target.value)}
-                fullWidth
-                InputProps={{
+              label="Серия паспорта *"
+              value={formData.серияПаспорта}
+              onChange={(e) => handleChange('серияПаспорта', e.target.value)}
+              fullWidth
+              error={!!errors.серияПаспорта}
+              helperText={errors.серияПаспорта}
+              InputProps={{
                 startAdornment: (
-                    <InputAdornment position="start">
+                  <InputAdornment position="start">
                     <Badge fontSize="small" />
-                    </InputAdornment>
+                  </InputAdornment>
                 ),
-                }}
+                inputProps: { maxLength: 4 }
+              }}
             />
             <TextField
-                label="Номер паспорта"
-                value={formData.номерПаспорта}
-                onChange={(e) => handleChange('номерПаспорта', e.target.value)}
-                fullWidth
+              label="Номер паспорта *"
+              value={formData.номерПаспорта}
+              onChange={(e) => handleChange('номерПаспорта', e.target.value)}
+              fullWidth
+              error={!!errors.номерПаспорта}
+              helperText={errors.номерПаспорта}
+              inputProps={{ maxLength: 6 }}
             />
             <TextField
-                label="Дата рождения"
-                value={formData.датаРождения}
-                onChange={(e) => handleChange('датаРождения', e.target.value)}
-                fullWidth
-                placeholder="дд.мм.гггг"
-                InputProps={{
+              label="Дата рождения *"
+              value={formData.датаРождения}
+              onChange={(e) => handleChange('датаРождения', e.target.value)}
+              fullWidth
+              placeholder="дд.мм.гггг"
+              error={!!errors.датаРождения}
+              helperText={errors.датаРождения}
+              InputProps={{
                 startAdornment: (
-                    <InputAdornment position="start">
+                  <InputAdornment position="start">
                     <Cake fontSize="small" />
-                    </InputAdornment>
+                  </InputAdornment>
                 ),
-                }}
+                inputProps: { maxLength: 10 }
+              }}
             />
-                        </Box>
-            Контакты
-            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)' }, gap: 2 }}>
+          </Box>
+
+          <Typography variant="subtitle1" fontWeight={600}>Контакты</Typography>
+          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)' }, gap: 2 }}>
             <TextField
-                label="Email"
-                type="email"
-                value={formData.email}
-                onChange={(e) => handleChange('email', e.target.value)}
-                fullWidth
-                InputProps={{
+              label="Email *"
+              type="email"
+              value={formData.email}
+              onChange={(e) => handleChange('email', e.target.value)}
+              fullWidth
+              error={!!errors.email}
+              helperText={errors.email}
+              InputProps={{
                 startAdornment: (
-                    <InputAdornment position="start">
+                  <InputAdornment position="start">
                     <Email fontSize="small" />
-                    </InputAdornment>
+                  </InputAdornment>
                 ),
-                }}
+              }}
             />
             <TextField
-                label="Телефон"
-                value={formData.телефон}
-                onChange={(e) => handleChange('телефон', e.target.value)}
-                fullWidth
-                InputProps={{
+              label="Телефон *"
+              value={formData.телефон}
+              onChange={(e) => handleChange('телефон', e.target.value)}
+              fullWidth
+              error={!!errors.телефон}
+              helperText={errors.телефон}
+              InputProps={{
                 startAdornment: (
-                    <InputAdornment position="start">
+                  <InputAdornment position="start">
                     <Phone fontSize="small" />
-                    </InputAdornment>
+                  </InputAdornment>
                 ),
-                }}
+              }}
             />
-            </Box>
+          </Box>
 
-            Рабочая информация
-            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)' }, gap: 2 }}>
-            <FormControl fullWidth>
-                <InputLabel>Роль</InputLabel>
-                <Select
+          <Typography variant="subtitle1" fontWeight={600}>Рабочая информация</Typography>
+          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)' }, gap: 2 }}>
+            <FormControl fullWidth required error={!!errors.роль}>
+              <InputLabel>Роль *</InputLabel>
+              <Select
                 value={formData.роль}
-                label="Роль"
-                onChange={(e) => handleChange('роль', e.target.value as Employee['роль'])}
-                >
-                {Object.entries(roleConfig).map(([key, config]) => (
-                    <MenuItem key={key} value={key}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <span>{config.icon}</span>
-                        <Typography>{config.label}</Typography>
-                    </Box>
-                    </MenuItem>
+                label="Роль *"
+                onChange={(e) => handleChange('роль', e.target.value)}
+              >
+                {rolesList.map((role) => (
+                  <MenuItem key={role.id} value={role.name}>
+                    {role.name}
+                  </MenuItem>
                 ))}
-                </Select>
+              </Select>
+              {errors.роль && <Typography color="error" variant="caption">{errors.роль}</Typography>}
             </FormControl>
-            <TextField
-                label="Должность"
-                value={formData.должность}
-                onChange={(e) => handleChange('должность', e.target.value)}
-                fullWidth
-                InputProps={{
-                startAdornment: (
-                    <InputAdornment position="start">
-                    <Work fontSize="small" />
-                    </InputAdornment>
-                ),
-                }}
-            />
-            </Box>
 
-            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)' }, gap: 2 }}>
-            <FormControl fullWidth>
-                <InputLabel>Подразделение</InputLabel>
-                <Select
-                value={formData.подразделение}
-                label="Подразделение"
-                onChange={(e) => handleChange('подразделение', e.target.value as Employee['подразделение'])}
-                >
-                {Object.entries(departmentConfig).map(([key, config]) => (
-                    <MenuItem key={key} value={key}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <span>{config.icon}</span>
-                        <Typography>{config.label}</Typography>
-                    </Box>
-                    </MenuItem>
+            <FormControl fullWidth required error={!!errors.должность}>
+              <InputLabel>Должность *</InputLabel>
+              <Select
+                value={formData.должность}
+                label="Должность *"
+                onChange={(e) => handleChange('должность', e.target.value)}
+              >
+                {positionsList.map((position) => (
+                  <MenuItem key={position.id} value={position.name}>
+                    {position.name}
+                  </MenuItem>
                 ))}
-                </Select>
+              </Select>
+              {errors.должность && <Typography color="error" variant="caption">{errors.должность}</Typography>}
             </FormControl>
-            </Box>
+          </Box>
+
+          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)' }, gap: 2 }}>
+            <FormControl fullWidth required error={!!errors.подразделение}>
+              <InputLabel>Подразделение *</InputLabel>
+              <Select
+                value={formData.подразделение}
+                label="Подразделение *"
+                onChange={(e) => handleChange('подразделение', e.target.value)}
+              >
+                {subdivisionsList.map((subdivision) => (
+                  <MenuItem key={subdivision.id} value={subdivision.name}>
+                    {subdivision.name}
+                  </MenuItem>
+                ))}
+              </Select>
+              {errors.подразделение && <Typography color="error" variant="caption">{errors.подразделение}</Typography>}
+            </FormControl>
+          </Box>
         </Box>
       </DialogContent>
       <DialogActions>
@@ -310,7 +384,8 @@ const EmployeeDialog: React.FC<EmployeeDialogProps> = ({
 };
 
 export const EmployeesPage: React.FC = () => {
-  const [employees, setEmployees] = useState<Employee[]>(employeesData);
+  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
@@ -319,10 +394,59 @@ export const EmployeesPage: React.FC = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [positionsList, setPositionsList] = useState<Position[]>([]);
+  const [subdivisionsList, setSubdivisionsList] = useState<Subdivision[]>([]);
+  const [rolesList, setRolesList] = useState<Role[]>([]);
+
+ useEffect(() => {
+  const fetchData = async () => {
+    try {
+      setLoading(true);
+
+      // Загружаем справочники и сотрудников параллельно
+      const [roles, positions, subdivisions, employeesApi] = await Promise.all([
+        getRoles(),
+        getPositions(),
+        getSubdivisions(),
+        fetch(`${API_BASE}/employees/`).then(r => r.json()), // получаем EmployeeApi[]
+      ]);
+      setRolesList(roles);
+      setPositionsList(positions);
+      setSubdivisionsList(subdivisions);
+
+      // Инициализируем конфигурации для отображения
+      initPositionConfig(positions);
+      initDepartmentConfig(subdivisions);
+      initRoleConfig(roles);
+
+      // Маппинг сотрудников с id → name
+      const mappedEmployees = mapEmployees(employeesApi, roles, positions, subdivisions);
+
+      setEmployees(mappedEmployees);
+
+      // Для отладки
+      console.log('Загруженные роли:', roles);
+      console.log('Загруженные позиции:', positions);
+      console.log('Загруженные подразделения:', subdivisions);
+      console.log('Сотрудники после маппинга:', mappedEmployees);
+      console.log('roleConfig:', roleConfig);
+      console.log('positionConfig:', positionConfig);
+      console.log('departmentConfig:', departmentConfig);
+    } catch (error) {
+      console.error('Ошибка загрузки данных:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  fetchData();
+}, []);
+
+
 
   // Фильтрация сотрудников
   const filteredEmployees = employees.filter(employee =>
-    `${employee.фамилия} ${employee.имя} ${employee.отчество}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    `${employee.фамилия} ${employee.имя}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
     employee.должность.toLowerCase().includes(searchTerm.toLowerCase()) ||
     employee.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
     employee.телефон.includes(searchTerm)
@@ -371,7 +495,7 @@ export const EmployeesPage: React.FC = () => {
     setSelectedEmployee(null);
   };
 
-  const handleDialogSubmit = (formData: EmployeeFormData) => {
+  const handleDialogSubmit = async (formData: EmployeeFormData) => {
     if (isEditing && selectedEmployee) {
       // Редактирование существующего сотрудника
       setEmployees(prev => prev.map(e => 
@@ -380,15 +504,36 @@ export const EmployeesPage: React.FC = () => {
           : e
       ));
     } else {
-      // Добавление нового сотрудника
+      const [roles, positions, subdivisions] = await Promise.all([
+        getRoles(),
+        getPositions(),
+        getSubdivisions()
+      ]);
+
+      const newEmployeeFromServer = await postEmployee(formData, roles, positions, subdivisions);
+      const roleMap = buildIdNameMap(roles);
+      const positionMap = buildIdNameMap(positions);
+      const subdivisionMap = buildIdNameMap(subdivisions);
+      
       const newEmployee: Employee = {
-        id: Math.max(...employees.map(e => e.id)) + 1,
-        ...formData,
+        id: newEmployeeFromServer.id,
+        фамилия: formData.фамилия,
+        имя: formData.имя,
+        email: formData.email,
+        телефон: formData.телефон,
+        серияПаспорта: formData.серияПаспорта,
+        номерПаспорта: formData.номерПаспорта,
+        датаРождения: formData.датаРождения,
+        роль: formData.роль,
+        должность: formData.должность,
+        подразделение: formData.подразделение,
       };
+
       setEmployees(prev => [...prev, newEmployee]);
     }
   };
 
+  
   return (
     <Box>
       {/* Заголовок и панель управления */}
@@ -486,6 +631,7 @@ export const EmployeesPage: React.FC = () => {
               {filteredEmployees
                 .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
                 .map((employee) => (
+                  
                   <TableRow 
                     key={employee.id}
                     hover
@@ -494,8 +640,7 @@ export const EmployeesPage: React.FC = () => {
                     <TableCell>
                       <Box>
                         <Typography fontWeight={600}>
-                          {employee.фамилия} {employee.имя} {employee.отчество}
-                        </Typography>
+                          {employee.фамилия} {employee.имя}                         </Typography>
                         <Typography variant="caption" color="text.secondary">
                           {employee.датаРождения}
                         </Typography>
@@ -581,7 +726,6 @@ export const EmployeesPage: React.FC = () => {
                 }}
               >
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                  <Typography variant="h4">{config.icon}</Typography>
                   <Typography variant="h5" fontWeight={600} color={config.color}>
                     {count}
                   </Typography>
@@ -621,6 +765,21 @@ export const EmployeesPage: React.FC = () => {
         onClose={() => setDialogOpen(false)}
         onSubmit={handleDialogSubmit}
         isEdit={isEditing}
+        positionsList={positionsList}
+        subdivisionsList={subdivisionsList}
+        rolesList={rolesList}
+        initialData={isEditing && selectedEmployee ? {
+          фамилия: selectedEmployee.фамилия,
+          имя: selectedEmployee.имя,
+          email: selectedEmployee.email,
+          телефон: selectedEmployee.телефон,
+          серияПаспорта: selectedEmployee.серияПаспорта,
+          номерПаспорта: selectedEmployee.номерПаспорта,
+          датаРождения: selectedEmployee.датаРождения,
+          роль: selectedEmployee.роль,
+          должность: selectedEmployee.должность,
+          подразделение: selectedEmployee.подразделение,
+        } : undefined}
       />
 
       {/* Диалог подтверждения удаления */}
@@ -628,7 +787,7 @@ export const EmployeesPage: React.FC = () => {
         <DialogTitle>Подтверждение удаления</DialogTitle>
         <DialogContent>
           <Alert severity="warning" sx={{ mb: 2 }}>
-            Вы уверены, что хотите удалить сотрудника "{selectedEmployee?.фамилия} {selectedEmployee?.имя} {selectedEmployee?.отчество}"?
+            Вы уверены, что хотите удалить сотрудника "{selectedEmployee?.фамилия} {selectedEmployee?.имя}"?
           </Alert>
           {selectedEmployee && (
             <Box sx={{ mt: 2 }}>
