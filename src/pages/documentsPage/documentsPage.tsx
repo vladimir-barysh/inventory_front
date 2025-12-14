@@ -14,18 +14,10 @@ import {
   TableHead,
   TableRow,
   TablePagination,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  FormControl,
-  InputLabel,
-  Select,
   MenuItem,
   Menu,
   ListItemIcon,
   ListItemText,
-  Alert,
   Chip,
 } from '@mui/material';
 import {
@@ -35,8 +27,6 @@ import {
   Delete,
   MoreVert,
   Description,
-  DateRange,
-  Comment,
   Assessment,
   Download,
   Print,
@@ -45,153 +35,20 @@ import {
   RemoveCircle,
   ArrowForward,
 } from '@mui/icons-material';
-import { SecondSidebar, FillDocumentDialog } from './../../components';
-import { Document, documentsData, DocumentFormData, mockProducts } from './makeData';
+import { SecondSidebar,DocumentLineDialog, DocumentAddDialog, DocumentDeleteDialog } from './../../components';
+import { Document, documentsData, DocumentFormData, mockProducts, mockSuppliers } from './makeData';
 
 // Типы для категорий документов
 interface CategoryItem {
   text: string;
   icon?: React.ReactElement;
   count?: number;
-  children?: string[];
 }
 
 interface CategorySection {
   title: string;
   items: CategoryItem[];
 }
-
-// Модальное окно для добавления/редактирования документа
-interface DocumentDialogProps {
-  open: boolean;
-  onClose: () => void;
-  onSubmit: (data: DocumentFormData) => void;
-  initialData?: DocumentFormData;
-  isEdit?: boolean;
-}
-
-const DocumentDialog: React.FC<DocumentDialogProps> = ({
-  open,
-  onClose,
-  onSubmit,
-  initialData,
-  isEdit = false,
-}) => {
-  const [formData, setFormData] = useState<DocumentFormData>(
-    initialData || {
-      номер: '',
-      дата: new Date().toLocaleDateString('ru-RU'),
-      комментарий: '',
-      тип: 'приходная',
-    }
-  );
-
-  const handleChange = (field: keyof DocumentFormData, value: string) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
-  };
-
-  const handleSubmit = () => {
-    onSubmit(formData);
-    onClose();
-  };
-
-  return (
-    <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
-      <DialogTitle>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          <Description />
-          {isEdit ? 'Редактировать документ' : 'Добавить новый документ'}
-        </Box>
-      </DialogTitle>
-      <DialogContent>
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 2 }}>
-          {/* Основная информация */}
-          <Typography variant="subtitle2" color="text.secondary">
-            Основная информация
-          </Typography>
-          
-          <Box sx={{ display: 'flex', gap: 2 }}>
-            <TextField
-              label="Номер документа"
-              value={formData.номер}
-              onChange={(e) => handleChange('номер', e.target.value)}
-              fullWidth
-              required
-              InputProps={{
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <Description fontSize="small" />
-                  </InputAdornment>
-                ),
-              }}
-            />
-            <TextField
-              label="Дата"
-              value={formData.дата}
-              onChange={(e) => handleChange('дата', e.target.value)}
-              fullWidth
-              InputProps={{
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <DateRange fontSize="small" />
-                  </InputAdornment>
-                ),
-              }}
-              placeholder="дд.мм.гггг"
-            />
-          </Box>
-
-          {/* Тип документа */}
-          <Typography variant="subtitle2" color="text.secondary">
-            Тип документа
-          </Typography>
-          <FormControl fullWidth>
-            <InputLabel>Тип документа</InputLabel>
-            <Select
-              value={formData.тип}
-              label="Тип документа"
-              onChange={(e) => handleChange('тип', e.target.value)}
-            >
-              <MenuItem value="приходная">Приходная накладная</MenuItem>
-              <MenuItem value="расходная">Расходная накладная</MenuItem>
-              <MenuItem value="инвентаризация">Акт инвентаризации</MenuItem>
-              <MenuItem value="списание">Акт списания</MenuItem>
-              <MenuItem value="перемещение">Заявка на перемещение</MenuItem>
-              <MenuItem value="отчёт">Отчёт</MenuItem>
-            </Select>
-          </FormControl>
-
-          {/* Комментарий */}
-          <Typography variant="subtitle2" color="text.secondary">
-            Комментарий {formData.тип === 'отчёт' && '(автозаполнен из типа отчёта)'}
-          </Typography>
-          <TextField
-            label="Комментарий"
-            value={formData.комментарий}
-            onChange={(e) => handleChange('комментарий', e.target.value)}
-            fullWidth
-            multiline
-            rows={3}
-            InputProps={{
-              startAdornment: (
-                <InputAdornment position="start">
-                  <Comment fontSize="small" />
-                </InputAdornment>
-              ),
-            }}
-            disabled={formData.тип === 'отчёт'}
-          />
-        </Box>
-      </DialogContent>
-      <DialogActions>
-        <Button onClick={onClose}>Отмена</Button>
-        <Button onClick={handleSubmit} variant="contained" color="primary">
-          {isEdit ? 'Сохранить' : 'Добавить'}
-        </Button>
-      </DialogActions>
-    </Dialog>
-  );
-};
 
 // Компонент для отображения типа документа
 const DocumentTypeChip: React.FC<{ type: Document['тип']}> = ({ type}) => {
@@ -299,11 +156,6 @@ export const DocumentsPage: React.FC = () => {
           text: 'Отчёты',
           icon: <Description />,
           count: documents.filter(d => d.тип === 'отчёт').length,
-          children: [
-            'Остатки товаров на складе', 
-            'Движение товаров', 
-            'Товары с истекающим сроком годности'
-          ],
         },
       ],
     },
@@ -314,10 +166,12 @@ export const DocumentsPage: React.FC = () => {
     const matchesSearch =
       document.номер.toLowerCase().includes(searchTerm.toLowerCase()) ||
       document.комментарий.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      document.дата.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (document.поставщик && document.поставщик.toLowerCase().includes(searchTerm.toLowerCase())) ||
       (document.строки && document.строки.some(line => 
         line.наименование.toLowerCase().includes(searchTerm.toLowerCase()) ||
         line.артикул.toLowerCase().includes(searchTerm.toLowerCase())
-      ));
+    ));
 
     const matchesType = !selectedType || 
       (selectedType === 'Отчёты' && document.тип === 'отчёт') ||
@@ -395,10 +249,7 @@ export const DocumentsPage: React.FC = () => {
       'Акты инвентаризации': 'инвентаризация',
       'Акты списания': 'списание',
       'Заявки на перемещение': 'перемещение',
-      'Отчёты': 'Отчёты', // Специальное значение для всех отчетов
-      'Остатки товаров на складе': 'отчёт',
-      'Движение товаров': 'отчёт',
-      'Товары с истекающим сроком годности': 'отчёт',
+      'Отчёты': 'Отчёты',
     };
 
     const mappedType = typeMap[category];
@@ -430,31 +281,6 @@ export const DocumentsPage: React.FC = () => {
     return document.строки ? document.строки.length : 0;
   };
 
-  // Функция для получения суммы документа
-  const getDocumentTotalAmount = (document: Document) => {
-    if (!document.строки || document.строки.length === 0) return 0;
-    
-    return document.строки.reduce((sum, line) => {
-      // Обрабатываем каждый тип строки по отдельности
-      switch (line.тип) {
-        case 'приходная':
-          return sum + line.сумма;
-        case 'расходная':
-          return sum + line.сумма;
-        case 'инвентаризация':
-          // Для инвентаризации используем сумму по учету
-          return sum + line.суммаПоУчету;
-        case 'перемещение':
-          // Для перемещения нет суммы, возвращаем 0
-          return sum + 0;
-        case 'списание':
-          return sum + line.сумма;
-        default:
-          return sum + 0;
-      }
-    }, 0);
-  };
-
   return (
     <Box sx={{ display: 'flex', height: '88vh' }}>
       {/* Второстепенный сайдбар с типами документов */}
@@ -483,7 +309,7 @@ export const DocumentsPage: React.FC = () => {
             }}>
               {/* Поле поиска */}
               <TextField
-                placeholder="Поиск по номеру, комментарию или товару..."
+                placeholder="Поиск по номеру, комментарию или дате"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 InputProps={{
@@ -540,16 +366,15 @@ export const DocumentsPage: React.FC = () => {
 
         {/* Таблица документов */}
         <Paper sx={{ width: '100%', overflow: 'hidden' }}>
-          <TableContainer sx={{ maxHeight: 440 }}>
+          <TableContainer sx={{ maxHeight: 550 }}>
             <Table stickyHeader>
               <TableHead>
                 <TableRow>
-                  <TableCell width="180px">Номер документа</TableCell>
+                  <TableCell width="150px">Номер документа</TableCell>
                   <TableCell width="100px">Дата</TableCell>
                   <TableCell width="140px">Тип документа</TableCell>
                   <TableCell width="80px">Строк</TableCell>
-                  <TableCell width="120px">Сумма</TableCell>
-                  <TableCell>Комментарий</TableCell>
+                  <TableCell width="300px">Комментарий</TableCell>
                   <TableCell width="80px" align="right">Действия</TableCell>
                 </TableRow>
               </TableHead>
@@ -570,11 +395,6 @@ export const DocumentsPage: React.FC = () => {
                         <Typography variant="body2" fontWeight={600}>
                           {document.номер}
                         </Typography>
-                        {document.тип === 'отчёт' && (
-                          <Typography variant="caption" color="text.secondary">
-                            Двойной клик не доступен
-                          </Typography>
-                        )}
                       </TableCell>
                       <TableCell>
                         <Typography variant="body2">
@@ -590,12 +410,13 @@ export const DocumentsPage: React.FC = () => {
                         </Typography>
                       </TableCell>
                       <TableCell>
-                        <Typography variant="body2" fontWeight={600}>
-                          {getDocumentTotalAmount(document).toLocaleString('ru-RU')} ₽
-                        </Typography>
-                      </TableCell>
-                      <TableCell>
                         <Typography variant="body2" color="text.secondary">
+                          {document.тип === 'приходная' && document.поставщик && (
+                            <Typography variant="caption" color="primary" fontWeight={600}>
+                              Поставщик: {document.поставщик}
+                              <br />
+                            </Typography>
+                          )}
                           {document.комментарий}
                         </Typography>
                         {document.строки && document.строки.length > 0 && (
@@ -646,17 +467,6 @@ export const DocumentsPage: React.FC = () => {
             </ListItemIcon>
             <ListItemText>Редактировать документ</ListItemText>
           </MenuItem>
-          {selectedDocument && selectedDocument.тип !== 'отчёт' && (
-            <MenuItem onClick={() => {
-              handleRowDoubleClick(selectedDocument);
-              handleMenuClose();
-            }}>
-              <ListItemIcon>
-                <Description fontSize="small" />
-              </ListItemIcon>
-              <ListItemText>Заполнить документ</ListItemText>
-            </MenuItem>
-          )}
           {selectedDocument?.тип === 'отчёт' && (
             <MenuItem onClick={() => {
               console.log('Скачать отчет:', selectedDocument);
@@ -688,17 +498,18 @@ export const DocumentsPage: React.FC = () => {
         </Menu>
 
         {/* Диалог добавления/редактирования */}
-        <DocumentDialog
+        <DocumentAddDialog
           open={dialogOpen}
           onClose={() => setDialogOpen(false)}
           onSubmit={handleDialogSubmit}
           initialData={selectedDocument || undefined}
           isEdit={isEditing}
+          suppliers={mockSuppliers} // Передаем список поставщиков
         />
 
         {/* Диалог заполнения документа */}
         {selectedDocument && (
-          <FillDocumentDialog
+          <DocumentLineDialog
             open={fillDialogOpen}
             onClose={() => {
               setFillDialogOpen(false);
@@ -711,39 +522,12 @@ export const DocumentsPage: React.FC = () => {
         )}
 
         {/* Диалог подтверждения удаления */}
-        <Dialog open={deleteDialogOpen} onClose={() => setDeleteDialogOpen(false)}>
-          <DialogTitle>Подтверждение удаления</DialogTitle>
-          <DialogContent>
-            <Alert severity="warning" sx={{ mb: 2 }}>
-              Вы уверены, что хотите удалить документ "{selectedDocument?.номер}"?
-              Это действие нельзя отменить.
-            </Alert>
-            {selectedDocument && (
-              <Box sx={{ mt: 2 }}>
-                <Typography variant="body2" color="text.secondary">
-                  <strong>Тип:</strong> <DocumentTypeChip type={selectedDocument.тип} />
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  <strong>Дата:</strong> {selectedDocument.дата}
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  <strong>Комментарий:</strong> {selectedDocument.комментарий}
-                </Typography>
-                {selectedDocument.строки && selectedDocument.строки.length > 0 && (
-                  <Typography variant="body2" color="text.secondary">
-                    <strong>Строк товаров:</strong> {selectedDocument.строки.length}
-                  </Typography>
-                )}
-              </Box>
-            )}
-          </DialogContent>
-          <DialogActions>
-            <Button onClick={() => setDeleteDialogOpen(false)}>Отмена</Button>
-            <Button onClick={handleDeleteConfirm} variant="contained" color="error">
-              Удалить
-            </Button>
-          </DialogActions>
-        </Dialog>
+        <DocumentDeleteDialog
+          open={deleteDialogOpen}
+          onClose={() => setDeleteDialogOpen(false)}
+          onConfirm={handleDeleteConfirm}
+          selectedDocument={selectedDocument}
+        />
       </Box>
     </Box>
   );

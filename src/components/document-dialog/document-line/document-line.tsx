@@ -46,10 +46,10 @@ import {
   ПеремещениеСтрока, 
   СписаниеСтрока,
   storageZones 
-} from './../../pages';
+} from '../../../pages';
 
 // Диалог для заполнения документа строками
-interface FillDocumentDialogProps {
+interface DocumentLineDialogProps {
   open: boolean;
   onClose: () => void;
   document: Document;
@@ -68,7 +68,7 @@ interface NewProductFormData {
   зонаХранения: string;
 }
 
-export const FillDocumentDialog: React.FC<FillDocumentDialogProps> = ({ 
+export const DocumentLineDialog: React.FC<DocumentLineDialogProps> = ({ 
   open, 
   onClose, 
   document, 
