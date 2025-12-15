@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box,
   Typography,
@@ -25,6 +25,7 @@ import {
   FormControl,
   InputAdornment,
   Collapse,
+  CircularProgress,
 } from '@mui/material';
 import {
   Description,
@@ -36,16 +37,18 @@ import {
   ExpandMore,
   ExpandLess,
 } from '@mui/icons-material';
+
 import { 
-  Document, 
-  Product, 
-  DocumentLine, 
-  ПриходнаяСтрока, 
-  РасходнаяСтрока, 
-  ИнвентаризацияСтрока, 
-  ПеремещениеСтрока, 
-  СписаниеСтрока,
-  storageZones 
+  Product,
+  Document,
+  DocumentLine as ApiDocumentLine,
+  DocumentLineCreate,
+  DocumentLineUpdate,
+  documentLineApi,
+  DocumentLine,
+  Category,
+  StorageZone,
+  Unit 
 } from '../../../pages';
 
 // Диалог для заполнения документа строками
@@ -54,275 +57,365 @@ interface DocumentLineDialogProps {
   onClose: () => void;
   document: Document;
   products: Product[];
-  onSave: (document: Document) => void;
+  storageZones: StorageZone[];
+  categories: Category[]; 
+  units: Unit[];         
+  onSave: () => void;
+}
+
+// Расширенный интерфейс для отображения строки документа с дополнительной информацией
+interface EnhancedDocumentLine extends ApiDocumentLine {
+  product?: Product;
+  storageZoneSender?: StorageZone;
+  storageZoneReceiver?: StorageZone;
+  purchase_price?: number;
+  sell_price?: number;
+  article?: number;
+  name?: string;
+  category?: string; // Название категории
+  unit?: string;     // Название единицы измерения
 }
 
 // Интерфейс для нового товара
 interface NewProductFormData {
-  артикул: string;
-  наименование: string;
-  категория: string;
-  единицаИзмерения: string;
-  ценаЗакупки: number;
-  ценаПродажи: number;
-  зонаХранения: string;
+  article: number;
+  name: string;
+  category: string;
+  unit: string;
+  purchase_price: number;
+  sell_price: number;
+  storage_zone_id: number | null;
 }
 
-export const DocumentLineDialog: React.FC<DocumentLineDialogProps> = ({ 
-  open, 
-  onClose, 
-  document, 
+export const DocumentLineDialog: React.FC<DocumentLineDialogProps> = ({
+  open,
+  onClose,
+  document,
   products,
-  onSave 
+  storageZones,
+  categories,
+  units, 
+  onSave
 }) => {
-  const [lines, setLines] = useState<DocumentLine[]>(document.строки || []);
+  const [lines, setLines] = useState<EnhancedDocumentLine[]>([]);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [showNewProductForm, setShowNewProductForm] = useState(false);
   const [newProductForm, setNewProductForm] = useState<NewProductFormData>({
-    артикул: '',
-    наименование: '',
-    категория: '',
-    единицаИзмерения: 'шт',
-    ценаЗакупки: 0,
-    ценаПродажи: 0,
-    зонаХранения: 'A-1',
+    article: 0,
+    name: '',
+    category: '',
+    unit: 'шт',
+    purchase_price: 0,
+    sell_price: 0,
+    storage_zone_id: null,
   });
+  const [loading, setLoading] = useState(false);
+  const [loadingLines, setLoadingLines] = useState(false);
 
-  // Добавляем новые категории для выбора
-  const categories = [
-    'Электроника',
-    'Канцтовары',
-    'Мебель',
-    'Оборудование',
-    'Хозтовары',
-    'Продукты',
-    'Медицинские товары',
-    'Строительные материалы',
-    'Текстиль',
-    'Другое'
-  ];
+  // Загрузка строк документа при открытии диалога
+  useEffect(() => {
+    if (open && document.id) {
+      loadDocumentLines();
+    }
+  }, [open, document.id]);
 
-  const units = ['шт', 'упак', 'набор'];
+
+
+  
+  const loadDocumentLines = async () => {
+  setLoadingLines(true);
+  try {
+    console.log('📡 Загрузка строк документа ID:', document.id);
+    
+    const response = await documentLineApi.getByDocumentId(document.id);
+    console.log('📦 Ответ API:', response);
+    
+    // Проверяем структуру ответа
+    if (!response) {
+      console.error('❌ Пустой ответ от API');
+      setLines([]);
+      return;
+    }
+    
+    let linesArray: DocumentLine[] = [];
+    
+    // Обработка разных структур ответа
+    if (Array.isArray(response)) {
+      // Если API возвращает массив напрямую
+      linesArray = response;
+    } else if (response.lines && Array.isArray(response.lines)) {
+      // Если API возвращает объект с полем lines (DocumentLinesResponse)
+      linesArray = response.lines;
+    } else if (Array.isArray((response as any).data)) {
+      // Если есть поле data (на всякий случай)
+      linesArray = (response as any).data;
+    } else {
+      console.error('❌ Неизвестная структура ответа:', response);
+      setLines([]);
+      return;
+    }
+    
+    console.log(`✅ Получено строк: ${linesArray.length}`);
+    console.log('📋 Строки:', linesArray);
+    
+    // Обогащаем данные
+    const enhancedLines: EnhancedDocumentLine[] = linesArray.map(line => {
+      const product = products.find(p => p.id === line.product_id);
+      const storageZoneSender = line.storage_zone_sender_id ? 
+        storageZones.find(z => z.id === line.storage_zone_sender_id) : undefined;
+      const storageZoneReceiver = line.storage_zone_receiver_id ? 
+        storageZones.find(z => z.id === line.storage_zone_receiver_id) : undefined;
+
+      const categoryName = product?.category_id ? 
+        categories.find(c => c.id === product.category_id)?.name : undefined;
+      
+      const unitName = product?.unit_id ? 
+        units.find(u => u.id === product.unit_id)?.name : undefined;
+
+      return {
+        ...line,
+        product,
+        storageZoneSender,
+        storageZoneReceiver,
+        purchase_price: product?.purchase_price,
+        sell_price: product?.sell_price,
+        article: product?.article,
+        name: product?.name,
+        category: categoryName,
+        unit: unitName,
+      };
+    });
+    
+    console.log('✨ Обогащенные строки:', enhancedLines);
+    setLines(enhancedLines);
+    
+  } catch (error) {
+    console.error('❌ Ошибка загрузки строк документа:', error);
+    alert('Не удалось загрузить строки документа');
+    setLines([]);
+  } finally {
+    setLoadingLines(false);
+  }
+};
 
   const handleAddNewProduct = () => {
-    if (!newProductForm.артикул.trim() || !newProductForm.наименование.trim()) {
-      alert('Заполните артикул и наименование товара');
+      if (!newProductForm.article || !newProductForm.name.trim()) {
+        alert('Заполните артикул и наименование товара');
+        return;
+      }
+
+      // В реальном приложении здесь будет вызов API для создания товара
+      alert('Создание нового товара через API еще не реализовано');
+      
+      // Сбрасываем форму
+      setNewProductForm({
+        article: 0,
+        name: '',
+        category: '',
+        unit: 'шт',
+        purchase_price: 0,
+        sell_price: 0,
+        storage_zone_id: null,
+      });
+      
+      setShowNewProductForm(false);
+    };
+
+    const handleAddLine = async () => {
+    if (!selectedProduct) {
+      alert('Выберите товар для добавления');
       return;
     }
 
-    // Генерируем временный ID (в реальном приложении это делается на бэкенде)
-    const tempId = -Date.now();
+    console.log('➕ === НАЧАЛО ДОБАВЛЕНИЯ СТРОКИ ===');
+    console.log('📦 Выбранный товар:', selectedProduct);
+    console.log('📄 Документ:', document);
+    console.log('🏷️ Тип документа:', document.document_type_id);
 
-    // Создаем строку документа для приходной накладной
-    const newLine: ПриходнаяСтрока = {
-      id: Date.now(),
-      documentId: document.id,
-      товарId: tempId,
-      артикул: newProductForm.артикул.trim(),
-      наименование: newProductForm.наименование.trim(),
-      категория: newProductForm.категория || 'Другое',
-      единицаИзмерения: newProductForm.единицаИзмерения || 'шт',
-      количество: 1,
-      ценаЗакупки: newProductForm.ценаЗакупки || 0,
-      ценаПродажи: newProductForm.ценаПродажи || 0,
-      сумма: (newProductForm.ценаЗакупки || 0) * 1,
-      зонаХранения: newProductForm.зонаХранения || 'A-1',
-      тип: 'приходная'
+    // Создаем объект для отправки
+    const lineData: DocumentLineCreate = {
+      document_id: document.id,
+      product_id: selectedProduct.id,
+      quantity: 1,
+      actual_quantity: 1, // ← ВАЖНО: передаем actual_quantity
+      storage_zone_sender_id: undefined,
+      storage_zone_receiver_id: undefined
     };
 
-    setLines(prev => [...prev, newLine]);
-    
-    // Сбрасываем форму
-    setNewProductForm({
-      артикул: '',
-      наименование: '',
-      категория: '',
-      единицаИзмерения: 'шт',
-      ценаЗакупки: 0,
-      ценаПродажи: 0,
-      зонаХранения: 'A-1',
-    });
-    
-    setShowNewProductForm(false);
-  };
-
-  const handleAddLine = () => {
-    if (!selectedProduct) return;
-
-    let newLine: DocumentLine;
-
-    switch (document.тип) {
-      case 'приходная':
-        newLine = {
-          id: Date.now(),
-          documentId: document.id,
-          товарId: selectedProduct.id,
-          артикул: selectedProduct.артикул,
-          наименование: selectedProduct.наименование,
-          категория: selectedProduct.категория,
-          единицаИзмерения: selectedProduct.единицаИзмерения,
-          количество: 1,
-          ценаЗакупки: selectedProduct.ценаЗакупки,
-          ценаПродажи: selectedProduct.ценаПродажи,
-          сумма: selectedProduct.ценаЗакупки * 1,
-          зонаХранения: selectedProduct.зонаХранения || 'A-1',
-          тип: 'приходная'
-        } as ПриходнаяСтрока;
+    // В зависимости от типа документа заполняем storage зоны
+    switch (document.document_type_id) {
+      case 1: // Приход
+        const receiverZoneId = newProductForm.storage_zone_id || 
+          (storageZones.length > 0 ? storageZones[0].id : null);
+        lineData.storage_zone_receiver_id = receiverZoneId;
+        console.log('📥 Приход: зона приемки ID:', receiverZoneId);
         break;
-
-      case 'расходная':
-        newLine = {
-          id: Date.now(),
-          documentId: document.id,
-          товарId: selectedProduct.id,
-          артикул: selectedProduct.артикул,
-          наименование: selectedProduct.наименование,
-          единицаИзмерения: selectedProduct.единицаИзмерения,
-          количество: 1,
-          ценаПродажи: selectedProduct.ценаПродажи,
-          сумма: selectedProduct.ценаПродажи * 1,
-          зонаХранения: selectedProduct.зонаХранения || 'A-1',
-          тип: 'расходная'
-        } as РасходнаяСтрока;
+      
+      case 2: // Расход
+        const senderZoneId = storageZones.length > 0 ? storageZones[0].id : null;
+        lineData.storage_zone_sender_id = senderZoneId;
+        console.log('📤 Расход: зона отгрузки ID:', senderZoneId);
         break;
-
-      case 'инвентаризация':
-        newLine = {
-          id: Date.now(),
-          documentId: document.id,
-          товарId: selectedProduct.id,
-          артикул: selectedProduct.артикул,
-          наименование: selectedProduct.наименование,
-          единицаИзмерения: selectedProduct.единицаИзмерения,
-          количество: selectedProduct.остаток,
-          фактическоеКоличество: selectedProduct.остаток,
-          цена: selectedProduct.ценаПродажи,
-          суммаПоУчету: selectedProduct.ценаПродажи * selectedProduct.остаток,
-          суммаФактическая: selectedProduct.ценаПродажи * selectedProduct.остаток,
-          тип: 'инвентаризация'
-        } as ИнвентаризацияСтрока;
+      
+      case 3: // Перемещение
+        lineData.storage_zone_sender_id = storageZones.length > 0 ? storageZones[0].id : null;
+        lineData.storage_zone_receiver_id = storageZones.length > 1 ? storageZones[1].id : 
+          (storageZones.length > 0 ? storageZones[0].id : null);
+        console.log('🔄 Перемещение: откуда ID', lineData.storage_zone_sender_id, 
+                    'куда ID', lineData.storage_zone_receiver_id);
         break;
-
-      case 'списание':
-        newLine = {
-          id: Date.now(),
-          documentId: document.id,
-          товарId: selectedProduct.id,
-          артикул: selectedProduct.артикул,
-          наименование: selectedProduct.наименование,
-          единицаИзмерения: selectedProduct.единицаИзмерения,
-          количество: selectedProduct.остаток,
-          количествоСписания: 0,
-          цена: selectedProduct.ценаЗакупки,
-          сумма: selectedProduct.ценаЗакупки * selectedProduct.остаток,
-          суммаСписания: 0,
-          зонаХранения: selectedProduct.зонаХранения || 'A-1',
-          тип: 'списание'
-        } as СписаниеСтрока;
+      
+      case 4: // Инвентаризация
+        // Для инвентаризации нужно получать текущее количество из БД
+        console.log('📊 Инвентаризация: зоны хранения не нужны');
+        // Можно оставить поля undefined или null
         break;
-
-      case 'перемещение':
-        newLine = {
-          id: Date.now(),
-          documentId: document.id,
-          товарId: selectedProduct.id,
-          артикул: selectedProduct.артикул,
-          наименование: selectedProduct.наименование,
-          единицаИзмерения: selectedProduct.единицаИзмерения,
-          количество: 1,
-          зонаХраненияОткуда: selectedProduct.зонаХранения || 'A-1',
-          зонаХраненияКуда: 'A-1',
-          тип: 'перемещение'
-        } as ПеремещениеСтрока;
+      
+      case 5: // Списание
+        const writeOffZoneId = storageZones.length > 0 ? storageZones[0].id : null;
+        lineData.storage_zone_sender_id = writeOffZoneId;
+        console.log('🗑️ Списание: зона списания ID:', writeOffZoneId);
         break;
-
-      default:
-        return;
     }
 
-    setLines(prev => [...prev, newLine]);
-    setSelectedProduct(null);
-  };
+    // Если значения null, лучше установить undefined
+    if (lineData.storage_zone_sender_id === null) {
+      lineData.storage_zone_sender_id = undefined;
+    }
+    if (lineData.storage_zone_receiver_id === null) {
+      lineData.storage_zone_receiver_id = undefined;
+    }
 
-  const handleRemoveLine = (lineId: number) => {
-    setLines(prev => prev.filter(line => line.id !== lineId));
-  };
+    console.log('📤 Данные для отправки на сервер:');
+    console.log(JSON.stringify(lineData, null, 2));
 
-  const handleFieldChange = (lineId: number, field: string, value: any) => {
-    setLines(prev => prev.map(line => {
-      if (line.id === lineId) {
-        const updatedLine = { ...line, [field]: value };
+    try {
+      setLoading(true);
+      
+      // Отправляем данные через API
+      console.log('📡 Отправка через documentLineApi.create...');
+      const response = await documentLineApi.create(lineData);
+      console.log('✅ Ответ от API:', response);
+      
+      // Проверяем ответ
+      if (response) {
+        // После успешного добавления обновляем список строк
+        await loadDocumentLines();
         
-        // Пересчитываем суммы в зависимости от типа документа
-        switch (updatedLine.тип) {
-          case 'приходная':
-            const приходнаяЛиния = updatedLine as ПриходнаяСтрока;
-            if (field === 'количество' || field === 'ценаЗакупки') {
-              приходнаяЛиния.сумма = приходнаяЛиния.количество * приходнаяЛиния.ценаЗакупки;
-            }
-            if (field === 'ценаПродажи') {
-              // Автоматически устанавливаем цену продажи на основе цены закупки если не заполнена
-              if (!приходнаяЛиния.ценаПродажи && приходнаяЛиния.ценаЗакупки) {
-                приходнаяЛиния.ценаПродажи = приходнаяЛиния.ценаЗакупки * 1.2; // Наценка 20%
-              }
-            }
-            break;
-
-          case 'расходная':
-            const расходнаяЛиния = updatedLine as РасходнаяСтрока;
-            if (field === 'количество' || field === 'ценаПродажи') {
-              расходнаяЛиния.сумма = расходнаяЛиния.количество * расходнаяЛиния.ценаПродажи;
-            }
-            break;
-
-          case 'инвентаризация':
-            const инвЛиния = updatedLine as ИнвентаризацияСтрока;
-            if (field === 'количество' || field === 'цена') {
-              инвЛиния.суммаПоУчету = инвЛиния.количество * инвЛиния.цена;
-            }
-            if (field === 'фактическоеКоличество' || field === 'цена') {
-              инвЛиния.суммаФактическая = инвЛиния.фактическоеКоличество * инвЛиния.цена;
-            }
-            break;
-
-          case 'списание':
-            const списаниеЛиния = updatedLine as СписаниеСтрока;
-            if (field === 'количество' || field === 'цена') {
-              списаниеЛиния.сумма = списаниеЛиния.количество * списаниеЛиния.цена;
-            }
-            if (field === 'количествоСписания' || field === 'цена') {
-              списаниеЛиния.суммаСписания = списаниеЛиния.количествоСписания * списаниеЛиния.цена;
-            }
-            break;
-        }
-        
-        return updatedLine;
+        // Сбрасываем выбранный товар
+        setSelectedProduct(null);
       }
-      return line;
-    }));
+      
+    } catch (error: any) {
+      console.error('❌ ПОЛНАЯ ОШИБКА:');
+      console.error('Сообщение:', error.message);
+      console.error('Статус:', error.response?.status);
+      console.error('Данные ошибки:', error.response?.data);
+      console.error('Конфиг запроса:', error.config);
+      
+      let errorMessage = 'Ошибка добавления строки';
+      if (error.response?.data?.detail) {
+        errorMessage = error.response.data.detail;
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      alert(`Ошибка: ${errorMessage}`);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleNewProductFieldChange = (field: keyof NewProductFormData, value: string | number) => {
-    setNewProductForm(prev => ({ ...prev, [field]: value }));
+  const handleRemoveLine = async (lineId: number) => {
+    try {
+      setLoading(true);
+      await documentLineApi.delete(lineId);
+      setLines(prev => prev.filter(line => line.id !== lineId));
+    } catch (error: any) {
+      console.error('Ошибка удаления строки:', error);
+      alert(error.response?.data?.detail || 'Не удалось удалить строку документа');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleFieldChange = async (lineId: number, field: string, value: any) => {
+    const lineToUpdate = lines.find(line => line.id === lineId);
+    if (!lineToUpdate) return;
+
+    const updateData: DocumentLineUpdate = {};
+
+    switch (field) {
+      case 'quantity':
+        updateData.quantity = Number(value);
+        break;
+      case 'storage_zone_sender_id':
+        updateData.storage_zone_sender_id = value ? Number(value) : null;
+        break;
+      case 'storage_zone_receiver_id':
+        updateData.storage_zone_receiver_id = value ? Number(value) : null;
+        break;
+    }
+
+    try {
+      setLoading(true);
+      const updatedLine = await documentLineApi.update(lineId, updateData);
+      
+      // Находим название категории по ID
+      const categoryName = lineToUpdate.product?.category_id ? 
+        categories.find(c => c.id === lineToUpdate.product!.category_id)?.name : undefined;
+      
+      // Находим название единицы измерения по ID
+      const unitName = lineToUpdate.product?.unit_id ? 
+        units.find(u => u.id === lineToUpdate.product!.unit_id)?.name : undefined;
+
+      // Обновляем строку в состоянии
+      setLines(prev => prev.map(line => 
+        line.id === lineId 
+          ? { 
+              ...line, 
+              ...updatedLine,
+              product: line.product,
+              purchase_price: line.purchase_price,
+              sell_price: line.sell_price,
+              article: line.article,
+              name: line.name,
+              category: categoryName,
+              unit: unitName,
+            } 
+          : line
+      ));
+    } catch (error: any) {
+      console.error('Ошибка обновления строки:', error);
+      alert(error.response?.data?.detail || 'Не удалось обновить строку документа');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleStringFieldChange = (field: 'name' | 'category' | 'unit', value: string) => {
+  setNewProductForm(prev => ({ ...prev, [field]: value }));
+};
+
+const handleNumberFieldChange = (field: 'article' | 'purchase_price' | 'sell_price', value: number) => {
+  setNewProductForm(prev => {
+    const newState = { ...prev, [field]: value };
     
     // Автоматически рассчитываем цену продажи при изменении цены закупки
-    if (field === 'ценаЗакупки' && newProductForm.ценаПродажи === 0) {
-      const purchasePrice = Number(value) || 0;
-      if (purchasePrice > 0) {
-        setNewProductForm(prev => ({ 
-          ...prev, 
-          ценаПродажи: purchasePrice * 1.2 // Наценка 20%
-        }));
-      }
+    if (field === 'purchase_price' && prev.sell_price === 0 && value > 0) {
+      newState.sell_price = value * 1.2; // Наценка 20%
     }
-  };
+    
+    return newState;
+  });
+};
+
+const handleStorageZoneChange = (value: number | null) => {
+  setNewProductForm(prev => ({ ...prev, storage_zone_id: value }));
+};
 
   const handleSave = () => {
-    const updatedDocument = {
-      ...document,
-      строки: lines,
-    };
-    onSave(updatedDocument);
+    onSave();
     onClose();
   };
 
@@ -331,57 +424,60 @@ export const DocumentLineDialog: React.FC<DocumentLineDialogProps> = ({
     let totals = {
       totalQuantity: 0,
       totalAmount: 0,
-      totalActualQuantity: 0,
-      discrepancy: 0,
       totalPurchaseAmount: 0,
       profit: 0,
-      totalWriteOffAmount: 0,
     };
 
     lines.forEach(line => {
-      totals.totalQuantity += line.количество;
+      totals.totalQuantity += line.quantity;
 
-      switch (line.тип) {
-        case 'приходная':
-          totals.totalPurchaseAmount += (line as ПриходнаяСтрока).сумма;
-          totals.totalAmount += (line as ПриходнаяСтрока).сумма;
+      switch (document.document_type_id) {
+        case 1: // Приход
+          totals.totalPurchaseAmount += (line.purchase_price || 0) * line.quantity;
+          totals.totalAmount += (line.purchase_price || 0) * line.quantity;
           break;
 
-        case 'расходная':
-          totals.totalAmount += (line as РасходнаяСтрока).сумма;
-          const product = products.find(p => p.id === line.товарId);
-          if (product) {
-            totals.profit += (line as РасходнаяСтрока).сумма - (product.ценаЗакупки * line.количество);
+        case 2: // Расход
+          totals.totalAmount += (line.sell_price || 0) * line.quantity;
+          if (line.product) {
+            totals.profit += (line.sell_price || 0) * line.quantity - 
+                           (line.product.purchase_price || 0) * line.quantity;
           }
           break;
 
-        case 'инвентаризация':
-          totals.totalAmount += (line as ИнвентаризацияСтрока).суммаПоУчету;
-          totals.totalActualQuantity += (line as ИнвентаризацияСтрока).фактическоеКоличество;
+        case 4: // Инвентаризация
+          totals.totalAmount += (line.sell_price || 0) * line.quantity;
           break;
 
-        case 'списание':
-          totals.totalAmount += (line as СписаниеСтрока).сумма;
-          totals.totalWriteOffAmount += (line as СписаниеСтрока).суммаСписания;
+        case 5: // Списание
+          totals.totalAmount += (line.purchase_price || 0) * line.quantity;
           break;
       }
     });
-
-    if (document.тип === 'инвентаризация') {
-      totals.discrepancy = totals.totalActualQuantity - totals.totalQuantity;
-    }
 
     return totals;
   };
 
   const totals = calculateTotals();
 
+  // Получаем тип документа для отображения
+  const getDocumentTypeName = () => {
+    switch (document.document_type_id) {
+      case 1: return 'приходная';
+      case 2: return 'расходная';
+      case 3: return 'перемещение';
+      case 4: return 'инвентаризация';
+      case 5: return 'списание';
+      default: return 'неизвестный';
+    }
+  };
+
   // Получаем уникальные категории товаров в документе
   const categoriesInDocument = Array.from(
     new Set(
       lines
-        .filter((line): line is ПриходнаяСтрока => line.тип === 'приходная')
-        .map(line => (line as ПриходнаяСтрока).категория)
+        .filter(line => line.category)
+        .map(line => line.category!)
     )
   );
 
@@ -389,81 +485,80 @@ export const DocumentLineDialog: React.FC<DocumentLineDialogProps> = ({
   const storageZonesInDocument = Array.from(
     new Set(
       lines.flatMap(line => {
-        if (line.тип === 'приходная') return [(line as ПриходнаяСтрока).зонаХранения];
-        if (line.тип === 'расходная') return [(line as РасходнаяСтрока).зонаХранения];
-        if (line.тип === 'списание') return [(line as СписаниеСтрока).зонаХранения];
-        if (line.тип === 'перемещение') return [
-          (line as ПеремещениеСтрока).зонаХраненияОткуда,
-          (line as ПеремещениеСтрока).зонаХраненияКуда
-        ];
-        return [];
-      }).filter(Boolean)
+        const zones = [];
+        if (line.storageZoneSender) zones.push(line.storageZoneSender.наименование);
+        if (line.storageZoneReceiver) zones.push(line.storageZoneReceiver.наименование);
+        return zones;
+      })
     )
   );
 
   // Рендерим строку таблицы в зависимости от типа документа
-  const renderTableRow = (line: DocumentLine, index: number) => {
-    switch (line.тип) {
-      case 'приходная':
-        const приходная = line as ПриходнаяСтрока;
+  const renderTableRow = (line: EnhancedDocumentLine, index: number) => {
+    const documentTypeId = document.document_type_id;
+
+    switch (documentTypeId) {
+      case 1: // Приходная
         return (
           <TableRow key={line.id} hover>
             <TableCell>{index + 1}</TableCell>
             <TableCell>
               <Typography variant="body2" fontWeight={600}>
-                {приходная.артикул}
+                {line.article || 'N/A'}
               </Typography>
             </TableCell>
             <TableCell>
               <Chip 
-                label={приходная.категория} 
+                label={line.category || 'Без категории'} 
                 size="small" 
                 sx={{ maxWidth: '100px' }}
               />
             </TableCell>
-            <TableCell>{приходная.наименование}</TableCell>
+            <TableCell>{line.name || 'Без названия'}</TableCell>
             <TableCell>
               <TextField
                 type="number"
-                value={приходная.количество}
-                onChange={(e) => handleFieldChange(line.id, 'количество', parseInt(e.target.value) || 0)}
+                value={line.quantity}
+                onChange={(e) => handleFieldChange(line.id, 'quantity', parseInt(e.target.value) || 0)}
                 size="small"
                 sx={{ width: '80px' }}
                 inputProps={{ min: 0 }}
+                disabled={loading}
               />
             </TableCell>
-            <TableCell>{приходная.единицаИзмерения}</TableCell>
+            <TableCell>{line.unit || 'шт'}</TableCell>
             <TableCell>
               <TextField
                 type="number"
-                value={приходная.ценаЗакупки}
-                onChange={(e) => handleFieldChange(line.id, 'ценаЗакупки', parseFloat(e.target.value) || 0)}
+                value={line.purchase_price || 0}
                 size="small"
                 sx={{ width: '100px' }}
                 inputProps={{ min: 0, step: 0.01 }}
+                disabled // Цена закупки не редактируется здесь
               />
             </TableCell>
             <TableCell sx={{ fontWeight: 600, whiteSpace: 'nowrap' }}>
-              {приходная.сумма.toLocaleString('ru-RU')} ₽
+              {((line.purchase_price || 0) * line.quantity).toLocaleString('ru-RU')} ₽
             </TableCell>
             <TableCell>
               <TextField
-                value={приходная.ценаПродажи}
-                onChange={(e) => handleFieldChange(line.id, 'ценаПродажи', parseFloat(e.target.value) || 0)}
+                value={line.sell_price || 0}
                 size="small"
                 sx={{ width: '100px' }}
                 type="number"
                 inputProps={{ min: 0, step: 0.01 }}
+                disabled // Цена продажи не редактируется здесь
               />
             </TableCell>
             <TableCell>
               <FormControl fullWidth size="small">
                 <Select
-                  value={приходная.зонаХранения}
-                  onChange={(e) => handleFieldChange(line.id, 'зонаХранения', e.target.value)}
+                  value={line.storage_zone_receiver_id || ''}
+                  onChange={(e) => handleFieldChange(line.id, 'storage_zone_receiver_id', e.target.value)}
+                  disabled={loading || storageZones.length === 0}
                 >
                   {storageZones.map(zone => (
-                    <MenuItem key={zone} value={zone}>{zone}</MenuItem>
+                    <MenuItem key={zone.id} value={zone.id}>{zone.наименование}</MenuItem>
                   ))}
                 </Select>
               </FormControl>
@@ -473,6 +568,7 @@ export const DocumentLineDialog: React.FC<DocumentLineDialogProps> = ({
                 size="small"
                 color="error"
                 onClick={() => handleRemoveLine(line.id)}
+                disabled={loading}
               >
                 <Close />
               </IconButton>
@@ -480,49 +576,50 @@ export const DocumentLineDialog: React.FC<DocumentLineDialogProps> = ({
           </TableRow>
         );
 
-      case 'расходная':
-        const расходная = line as РасходнаяСтрока;
+      case 2: // Расходная
         return (
           <TableRow key={line.id} hover>
             <TableCell>{index + 1}</TableCell>
             <TableCell>
               <Typography variant="body2" fontWeight={600}>
-                {расходная.артикул}
+                {line.article || 'N/A'}
               </Typography>
             </TableCell>
-            <TableCell>{расходная.наименование}</TableCell>
+            <TableCell>{line.name || 'Без названия'}</TableCell>
             <TableCell>
               <TextField
                 type="number"
-                value={расходная.количество}
-                onChange={(e) => handleFieldChange(line.id, 'количество', parseInt(e.target.value) || 0)}
+                value={line.quantity}
+                onChange={(e) => handleFieldChange(line.id, 'quantity', parseInt(e.target.value) || 0)}
                 size="small"
                 sx={{ width: '80px' }}
                 inputProps={{ min: 0 }}
+                disabled={loading}
               />
             </TableCell>
-            <TableCell>{расходная.единицаИзмерения}</TableCell>
+            <TableCell>{line.unit || 'шт'}</TableCell>
             <TableCell>
               <TextField
                 type="number"
-                value={расходная.ценаПродажи}
-                onChange={(e) => handleFieldChange(line.id, 'ценаПродажи', parseFloat(e.target.value) || 0)}
+                value={line.sell_price || 0}
                 size="small"
                 sx={{ width: '100px' }}
                 inputProps={{ min: 0, step: 0.01 }}
+                disabled // Цена продажи не редактируется здесь
               />
             </TableCell>
             <TableCell sx={{ fontWeight: 600, whiteSpace: 'nowrap' }}>
-              {расходная.сумма.toLocaleString('ru-RU')} ₽
+              {((line.sell_price || 0) * line.quantity).toLocaleString('ru-RU')} ₽
             </TableCell>
             <TableCell>
               <FormControl fullWidth size="small">
                 <Select
-                  value={расходная.зонаХранения}
-                  onChange={(e) => handleFieldChange(line.id, 'зонаХранения', e.target.value)}
+                  value={line.storage_zone_sender_id || ''}
+                  onChange={(e) => handleFieldChange(line.id, 'storage_zone_sender_id', e.target.value)}
+                  disabled={loading || storageZones.length === 0}
                 >
                   {storageZones.map(zone => (
-                    <MenuItem key={zone} value={zone}>{zone}</MenuItem>
+                    <MenuItem key={zone.id} value={zone.id}>{zone.наименование}</MenuItem>
                   ))}
                 </Select>
               </FormControl>
@@ -532,6 +629,7 @@ export const DocumentLineDialog: React.FC<DocumentLineDialogProps> = ({
                 size="small"
                 color="error"
                 onClick={() => handleRemoveLine(line.id)}
+                disabled={loading}
               >
                 <Close />
               </IconButton>
@@ -539,55 +637,60 @@ export const DocumentLineDialog: React.FC<DocumentLineDialogProps> = ({
           </TableRow>
         );
 
-      case 'инвентаризация':
-        const инвентаризация = line as ИнвентаризацияСтрока;
-        const расхождение = инвентаризация.фактическоеКоличество - инвентаризация.количество;
+      case 3: // Перемещение
         return (
           <TableRow key={line.id} hover>
             <TableCell>{index + 1}</TableCell>
             <TableCell>
               <Typography variant="body2" fontWeight={600}>
-                {инвентаризация.артикул}
+                {line.article || 'N/A'}
               </Typography>
             </TableCell>
-            <TableCell>{инвентаризация.наименование}</TableCell>
-            <TableCell>{инвентаризация.единицаИзмерения}</TableCell>
+            <TableCell>{line.name || 'Без названия'}</TableCell>
             <TableCell>
               <TextField
                 type="number"
-                value={инвентаризация.количество}
-                onChange={(e) => handleFieldChange(line.id, 'количество', parseInt(e.target.value) || 0)}
+                value={line.quantity}
+                onChange={(e) => handleFieldChange(line.id, 'quantity', parseInt(e.target.value) || 0)}
                 size="small"
                 sx={{ width: '80px' }}
                 inputProps={{ min: 0 }}
+                disabled={loading}
               />
             </TableCell>
-            <TableCell sx={{ fontWeight: 600, whiteSpace: 'nowrap' }}>
-              {инвентаризация.суммаПоУчету.toLocaleString('ru-RU')} ₽
+            <TableCell>{line.unit || 'шт'}</TableCell>
+            <TableCell>
+              <FormControl fullWidth size="small">
+                <Select
+                  value={line.storage_zone_sender_id || ''}
+                  onChange={(e) => handleFieldChange(line.id, 'storage_zone_sender_id', e.target.value)}
+                  disabled={loading || storageZones.length === 0}
+                >
+                  {storageZones.map(zone => (
+                    <MenuItem key={zone.id} value={zone.id}>{zone.наименование}</MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
             </TableCell>
             <TableCell>
-              <TextField
-                type="number"
-                value={инвентаризация.фактическоеКоличество}
-                onChange={(e) => handleFieldChange(line.id, 'фактическоеКоличество', parseInt(e.target.value) || 0)}
-                size="small"
-                sx={{ width: '80px' }}
-                inputProps={{ min: 0 }}
-              />
-            </TableCell>
-            <TableCell sx={{ fontWeight: 600, color: расхождение < 0 ? 'error.main' : 'inherit', whiteSpace: 'nowrap' }}>
-              {инвентаризация.суммаФактическая.toLocaleString('ru-RU')} ₽
-              {расхождение !== 0 && (
-                <Typography variant="caption" display="block" color={расхождение < 0 ? 'error' : 'success'}>
-                  {расхождение > 0 ? '+' : ''}{расхождение} ед.
-                </Typography>
-              )}
+              <FormControl fullWidth size="small">
+                <Select
+                  value={line.storage_zone_receiver_id || ''}
+                  onChange={(e) => handleFieldChange(line.id, 'storage_zone_receiver_id', e.target.value)}
+                  disabled={loading || storageZones.length === 0}
+                >
+                  {storageZones.map(zone => (
+                    <MenuItem key={zone.id} value={zone.id}>{zone.наименование}</MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
             </TableCell>
             <TableCell align="center">
               <IconButton
                 size="small"
                 color="error"
                 onClick={() => handleRemoveLine(line.id)}
+                disabled={loading}
               >
                 <Close />
               </IconButton>
@@ -595,57 +698,37 @@ export const DocumentLineDialog: React.FC<DocumentLineDialogProps> = ({
           </TableRow>
         );
 
-      case 'перемещение':
-        const перемещение = line as ПеремещениеСтрока;
+      case 4: // Инвентаризация
         return (
           <TableRow key={line.id} hover>
             <TableCell>{index + 1}</TableCell>
             <TableCell>
               <Typography variant="body2" fontWeight={600}>
-                {перемещение.артикул}
+                {line.article || 'N/A'}
               </Typography>
             </TableCell>
-            <TableCell>{перемещение.наименование}</TableCell>
+            <TableCell>{line.name || 'Без названия'}</TableCell>
+            <TableCell>{line.unit || 'шт'}</TableCell>
             <TableCell>
               <TextField
                 type="number"
-                value={перемещение.количество}
-                onChange={(e) => handleFieldChange(line.id, 'количество', parseInt(e.target.value) || 0)}
+                value={line.quantity}
+                onChange={(e) => handleFieldChange(line.id, 'quantity', parseInt(e.target.value) || 0)}
                 size="small"
                 sx={{ width: '80px' }}
                 inputProps={{ min: 0 }}
+                disabled={loading}
               />
             </TableCell>
-            <TableCell>{перемещение.единицаИзмерения}</TableCell>
-            <TableCell>
-              <FormControl fullWidth size="small">
-                <Select
-                  value={перемещение.зонаХраненияОткуда}
-                  onChange={(e) => handleFieldChange(line.id, 'зонаХраненияОткуда', e.target.value)}
-                >
-                  {storageZones.map(zone => (
-                    <MenuItem key={zone} value={zone}>{zone}</MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-            </TableCell>
-            <TableCell>
-              <FormControl fullWidth size="small">
-                <Select
-                  value={перемещение.зонаХраненияКуда}
-                  onChange={(e) => handleFieldChange(line.id, 'зонаХраненияКуда', e.target.value)}
-                >
-                  {storageZones.map(zone => (
-                    <MenuItem key={zone} value={zone}>{zone}</MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
+            <TableCell sx={{ fontWeight: 600, whiteSpace: 'nowrap' }}>
+              {((line.sell_price || 0) * line.quantity).toLocaleString('ru-RU')} ₽
             </TableCell>
             <TableCell align="center">
               <IconButton
                 size="small"
                 color="error"
                 onClick={() => handleRemoveLine(line.id)}
+                disabled={loading}
               >
                 <Close />
               </IconButton>
@@ -653,52 +736,40 @@ export const DocumentLineDialog: React.FC<DocumentLineDialogProps> = ({
           </TableRow>
         );
 
-      case 'списание':
-        const списание = line as СписаниеСтрока;
+      case 5: // Списание
         return (
           <TableRow key={line.id} hover>
             <TableCell>{index + 1}</TableCell>
             <TableCell>
               <Typography variant="body2" fontWeight={600}>
-                {списание.артикул}
+                {line.article || 'N/A'}
               </Typography>
             </TableCell>
-            <TableCell>{списание.наименование}</TableCell>
-            <TableCell>{списание.единицаИзмерения}</TableCell>
+            <TableCell>{line.name || 'Без названия'}</TableCell>
+            <TableCell>{line.unit || 'шт'}</TableCell>
             <TableCell>
               <TextField
                 type="number"
-                value={списание.количество}
-                onChange={(e) => handleFieldChange(line.id, 'количество', parseInt(e.target.value) || 0)}
+                value={line.quantity}
+                onChange={(e) => handleFieldChange(line.id, 'quantity', parseInt(e.target.value) || 0)}
                 size="small"
                 sx={{ width: '80px' }}
                 inputProps={{ min: 0 }}
+                disabled={loading}
               />
             </TableCell>
             <TableCell sx={{ fontWeight: 600, whiteSpace: 'nowrap' }}>
-              {списание.сумма.toLocaleString('ru-RU')} ₽
-            </TableCell>
-            <TableCell>
-              <TextField
-                type="number"
-                value={списание.количествоСписания}
-                onChange={(e) => handleFieldChange(line.id, 'количествоСписания', parseInt(e.target.value) || 0)}
-                size="small"
-                sx={{ width: '80px' }}
-                inputProps={{ min: 0, max: списание.количество }}
-              />
-            </TableCell>
-            <TableCell sx={{ fontWeight: 600, color: 'error.main', whiteSpace: 'nowrap' }}>
-              {списание.суммаСписания.toLocaleString('ru-RU')} ₽
+              {((line.purchase_price || 0) * line.quantity).toLocaleString('ru-RU')} ₽
             </TableCell>
             <TableCell>
               <FormControl fullWidth size="small">
                 <Select
-                  value={списание.зонаХранения}
-                  onChange={(e) => handleFieldChange(line.id, 'зонаХранения', e.target.value)}
+                  value={line.storage_zone_sender_id || ''}
+                  onChange={(e) => handleFieldChange(line.id, 'storage_zone_sender_id', e.target.value)}
+                  disabled={loading || storageZones.length === 0}
                 >
                   {storageZones.map(zone => (
-                    <MenuItem key={zone} value={zone}>{zone}</MenuItem>
+                    <MenuItem key={zone.id} value={zone.id}>{zone.наименование}</MenuItem>
                   ))}
                 </Select>
               </FormControl>
@@ -708,6 +779,7 @@ export const DocumentLineDialog: React.FC<DocumentLineDialogProps> = ({
                 size="small"
                 color="error"
                 onClick={() => handleRemoveLine(line.id)}
+                disabled={loading}
               >
                 <Close />
               </IconButton>
@@ -722,8 +794,10 @@ export const DocumentLineDialog: React.FC<DocumentLineDialogProps> = ({
 
   // Рендерим заголовки таблицы в зависимости от типа документа
   const renderTableHeaders = () => {
-    switch (document.тип) {
-      case 'приходная':
+    const documentTypeId = document.document_type_id;
+
+    switch (documentTypeId) {
+      case 1: // Приходная
         return (
           <>
             <TableCell width="50px">№</TableCell>
@@ -740,7 +814,7 @@ export const DocumentLineDialog: React.FC<DocumentLineDialogProps> = ({
           </>
         );
 
-      case 'расходная':
+      case 2: // Расходная
         return (
           <>
             <TableCell width="50px">№</TableCell>
@@ -755,22 +829,7 @@ export const DocumentLineDialog: React.FC<DocumentLineDialogProps> = ({
           </>
         );
 
-      case 'инвентаризация':
-        return (
-          <>
-            <TableCell width="50px">№</TableCell>
-            <TableCell width="100px">Артикул</TableCell>
-            <TableCell>Наименование</TableCell>
-            <TableCell width="90px">Ед. изм.</TableCell>
-            <TableCell width="120px">Кол-во по учёту</TableCell>
-            <TableCell width="120px">Сумма</TableCell>
-            <TableCell width="120px">Кол-во фактическое</TableCell>
-            <TableCell width="130px">Сумма</TableCell>
-            <TableCell width="60px" align="center">Действия</TableCell>
-          </>
-        );
-
-      case 'перемещение':
+      case 3: // Перемещение
         return (
           <>
             <TableCell width="50px">№</TableCell>
@@ -784,7 +843,20 @@ export const DocumentLineDialog: React.FC<DocumentLineDialogProps> = ({
           </>
         );
 
-      case 'списание':
+      case 4: // Инвентаризация
+        return (
+          <>
+            <TableCell width="50px">№</TableCell>
+            <TableCell width="100px">Артикул</TableCell>
+            <TableCell>Наименование</TableCell>
+            <TableCell width="90px">Ед. изм.</TableCell>
+            <TableCell width="120px">Кол-во по учёту</TableCell>
+            <TableCell width="120px">Сумма</TableCell>
+            <TableCell width="60px" align="center">Действия</TableCell>
+          </>
+        );
+
+      case 5: // Списание
         return (
           <>
             <TableCell width="50px">№</TableCell>
@@ -793,8 +865,6 @@ export const DocumentLineDialog: React.FC<DocumentLineDialogProps> = ({
             <TableCell width="90px">Ед. изм.</TableCell>
             <TableCell width="120px">Кол-во на складе</TableCell>
             <TableCell width="120px">Сумма</TableCell>
-            <TableCell width="120px">Кол-во списания</TableCell>
-            <TableCell width="130px">Сумма списания</TableCell>
             <TableCell width="120px">Зона хранения</TableCell>
             <TableCell width="60px" align="center">Действия</TableCell>
           </>
@@ -807,8 +877,10 @@ export const DocumentLineDialog: React.FC<DocumentLineDialogProps> = ({
 
   // Рендерим итоговую строку в зависимости от типа документа
   const renderTableFooter = () => {
-    switch (document.тип) {
-      case 'приходная':
+    const documentTypeId = document.document_type_id;
+
+    switch (documentTypeId) {
+      case 1: // Приходная
         return (
           <TableRow>
             <TableCell colSpan={6} align="right">
@@ -830,7 +902,7 @@ export const DocumentLineDialog: React.FC<DocumentLineDialogProps> = ({
           </TableRow>
         );
 
-      case 'расходная':
+      case 2: // Расходная
         return (
           <TableRow>
             <TableCell colSpan={5} align="right">
@@ -855,71 +927,7 @@ export const DocumentLineDialog: React.FC<DocumentLineDialogProps> = ({
           </TableRow>
         );
 
-      case 'инвентаризация':
-        return (
-          <TableRow>
-            <TableCell colSpan={4} align="right">
-              <Typography variant="subtitle1" fontWeight={600}>
-                Итого:
-              </Typography>
-            </TableCell>
-            <TableCell align="right">
-              <Typography variant="subtitle1" fontWeight={600}>
-                {totals.totalQuantity} ед.
-              </Typography>
-            </TableCell>
-            <TableCell align="right">
-              <Typography variant="subtitle1" fontWeight={600} sx={{ whiteSpace: 'nowrap' }}>
-                {totals.totalAmount.toLocaleString('ru-RU')} ₽
-              </Typography>
-            </TableCell>
-            <TableCell align="right">
-              <Typography variant="subtitle1" fontWeight={600}>
-                {totals.totalActualQuantity} ед.
-              </Typography>
-              {totals.discrepancy !== 0 && (
-                <Typography variant="caption" color={totals.discrepancy < 0 ? 'error' : 'success'}>
-                  Расхождение: {totals.discrepancy > 0 ? '+' : ''}{totals.discrepancy} ед.
-                </Typography>
-              )}
-            </TableCell>
-            <TableCell align="right">
-              <Typography variant="subtitle1" fontWeight={600} sx={{ whiteSpace: 'nowrap' }}>
-                {(totals.totalAmount + totals.discrepancy * (lines[0] as ИнвентаризацияСтрока)?.цена || 0).toLocaleString('ru-RU')} ₽
-              </Typography>
-            </TableCell>
-            <TableCell></TableCell>
-          </TableRow>
-        );
-
-      case 'списание':
-        return (
-          <TableRow>
-            <TableCell colSpan={5} align="right">
-              <Typography variant="subtitle1" fontWeight={600}>
-                Итого:
-              </Typography>
-            </TableCell>
-            <TableCell align="right">
-              <Typography variant="subtitle1" fontWeight={600} sx={{ whiteSpace: 'nowrap' }}>
-                {totals.totalAmount.toLocaleString('ru-RU')} ₽
-              </Typography>
-            </TableCell>
-            <TableCell align="right">
-              <Typography variant="subtitle1" fontWeight={600}>
-                {lines.reduce((sum, line) => sum + (line as СписаниеСтрока).количествоСписания, 0)} ед.
-              </Typography>
-            </TableCell>
-            <TableCell align="right">
-              <Typography variant="subtitle1" fontWeight={600} color="error.main" sx={{ whiteSpace: 'nowrap' }}>
-                {totals.totalWriteOffAmount.toLocaleString('ru-RU')} ₽
-              </Typography>
-            </TableCell>
-            <TableCell colSpan={2}></TableCell>
-          </TableRow>
-        );
-
-      case 'перемещение':
+      case 3: // Перемещение
         return (
           <TableRow>
             <TableCell colSpan={4} align="right">
@@ -936,10 +944,32 @@ export const DocumentLineDialog: React.FC<DocumentLineDialogProps> = ({
           </TableRow>
         );
 
+      case 5: // Списание
+        return (
+          <TableRow>
+            <TableCell colSpan={5} align="right">
+              <Typography variant="subtitle1" fontWeight={600}>
+                Итого:
+              </Typography>
+            </TableCell>
+            <TableCell align="right">
+              <Typography variant="subtitle1" fontWeight={600} sx={{ whiteSpace: 'nowrap' }}>
+                {totals.totalAmount.toLocaleString('ru-RU')} ₽
+              </Typography>
+            </TableCell>
+            <TableCell colSpan={2}></TableCell>
+          </TableRow>
+        );
+
       default:
         return null;
     }
   };
+
+  // Фильтруем товары, которые уже есть в документе
+  const availableProducts = products.filter(p => 
+    !lines.some(l => l.product_id === p.id)
+  );
 
   return (
     <Dialog 
@@ -957,420 +987,433 @@ export const DocumentLineDialog: React.FC<DocumentLineDialogProps> = ({
             <Description />
             <Box>
               <Typography variant="h6" component="div">
-                Заполнение документа: {document.номер}
+                Заполнение документа: {document.number}
               </Typography>
               <Typography variant="body2" color="text.secondary">
-                {document.дата} • {document.комментарий}
+                {document.date} • {document.comment}
               </Typography>
             </Box>
             <Chip
-              label={document.тип}
+              label={getDocumentTypeName()}
               size="small"
               color="primary"
               sx={{ ml: 2 }}
             />
           </Box>
-          <IconButton onClick={onClose} size="small">
+          <IconButton onClick={onClose} size="small" disabled={loading}>
             <Close />
           </IconButton>
         </Box>
       </DialogTitle>
 
       <DialogContent dividers sx={{ overflow: 'hidden' }}>
-        <Box sx={{ 
-          display: 'flex', 
-          flexDirection: { xs: 'column', md: 'row' }, 
-          gap: 2, 
-          height: '100%' 
-        }}>
-          {/* Левая колонка - добавление товара и статистика */}
-        <Box sx={{ 
-            width: { xs: '100%', md: '30%' },
-            minWidth: { md: 350 },
-            flexShrink: 0,
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 2, // Добавляем отступ между компонентами
+        {loadingLines ? (
+          <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
+            <CircularProgress />
+            <Typography sx={{ ml: 2 }}>Загрузка строк документа...</Typography>
+          </Box>
+        ) : (
+          <Box sx={{ 
+            display: 'flex', 
+            flexDirection: { xs: 'column', md: 'row' }, 
+            gap: 2, 
+            height: '100%' 
+          }}>
+            {/* Левая колонка - добавление товара и статистика */}
+            <Box sx={{ 
+              width: { xs: '100%', md: '30%' },
+              minWidth: { md: 350 },
+              flexShrink: 0,
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 2,
             }}>
-            {/* Блок добавления товара */}
-            <Paper sx={{ p: 2 }}>
+              {/* Блок добавления товара */}
+              <Paper sx={{ p: 2 }}>
                 <Typography variant="subtitle1" sx={{ mb: 2, fontWeight: 600 }}>
-                <AddCircle sx={{ mr: 1, verticalAlign: 'middle' }} />
-                Добавить товар
+                  <AddCircle sx={{ mr: 1, verticalAlign: 'middle' }} />
+                  Добавить товар
                 </Typography>
                 
                 {/* Автокомплит для поиска существующих товаров */}
                 <Autocomplete
-                value={selectedProduct}
-                onChange={(_, newValue) => setSelectedProduct(newValue)}
-                options={products.filter(p => !lines.some(l => l.товарId === p.id))}
-                getOptionLabel={(option) => `${option.артикул} - ${option.наименование}`}
-                renderInput={(params) => (
+                  value={selectedProduct}
+                  onChange={(_, newValue) => setSelectedProduct(newValue)}
+                  options={availableProducts}
+                  getOptionLabel={(option) => `${option.article} - ${option.name}`}
+                  renderInput={(params) => (
                     <TextField
-                    {...params}
-                    label="Поиск товара в базе"
-                    size="small"
-                    fullWidth
-                    sx={{ mb: 2 }}
-                    helperText="Выберите существующий товар"
+                      {...params}
+                      label="Поиск товара в базе"
+                      size="small"
+                      fullWidth
+                      sx={{ mb: 2 }}
+                      helperText="Выберите существующий товар"
                     />
-                )}
+                  )}
                 />
                 
                 {/* Кнопка для добавления нового товара (только для приходных накладных) */}
-                {document.тип === 'приходная' && (
-                <>
+                {document.document_type_id === 1 && (
+                  <>
                     <Button
-                    variant="outlined"
-                    fullWidth
-                    onClick={() => setShowNewProductForm(!showNewProductForm)}
-                    sx={{ mb: 2 }}
-                    endIcon={showNewProductForm ? <ExpandLess /> : <ExpandMore />}
+                      variant="outlined"
+                      fullWidth
+                      onClick={() => setShowNewProductForm(!showNewProductForm)}
+                      sx={{ mb: 2 }}
+                      endIcon={showNewProductForm ? <ExpandLess /> : <ExpandMore />}
                     >
-                    {showNewProductForm ? 'Скрыть форму' : 'Добавить новый товар'}
+                      {showNewProductForm ? 'Скрыть форму' : 'Добавить новый товар'}
                     </Button>
                     
                     <Collapse in={showNewProductForm}>
-                    <Paper sx={{ 
+                      <Paper sx={{ 
                         p: 2, 
                         mb: 2, 
                         bgcolor: 'white',
                         border: '1px solid', 
                         borderColor: 'primary.main' 
-                    }}>
+                      }}>
                         <Typography variant="subtitle2" sx={{ mb: 2, fontWeight: 600 }}>
-                        Новый товар
+                          Новый товар
                         </Typography>
                         
                         <Stack spacing={2}>
-                        <TextField
+                          <TextField
                             label="Артикул"
-                            value={newProductForm.артикул}
-                            onChange={(e) => handleNewProductFieldChange('артикул', e.target.value)}
+                            value={newProductForm.article}
+                            onChange={(e) => handleNumberFieldChange('article', parseInt(e.target.value) || 0)}
                             size="small"
                             fullWidth
                             required
-                        />
-                        
-                        <TextField
+                            type="number"
+                          />
+                          
+                          <TextField
                             label="Наименование"
-                            value={newProductForm.наименование}
-                            onChange={(e) => handleNewProductFieldChange('наименование', e.target.value)}
+                            value={newProductForm.name}
+                            onChange={(e) => handleStringFieldChange('name', e.target.value)}
                             size="small"
                             fullWidth
                             required
-                        />
-                        
-                        <Autocomplete
+                          />
+                          
+                          <Autocomplete
                             freeSolo
-                            value={newProductForm.категория}
-                            onChange={(_, newValue) => handleNewProductFieldChange('категория', newValue || '')}
-                            options={categories}
+                            value={newProductForm.category}
+                            onChange={(_, newValue) => handleStringFieldChange('category', newValue || '')}
+                            options={categories.map(c => c.name)}
                             renderInput={(params) => (
-                            <TextField
+                              <TextField
                                 {...params}
                                 label="Категория"
                                 size="small"
                                 required
                                 fullWidth
-                            />
+                              />
                             )}
-                        />
-                        
-                        <Box sx={{ display: 'flex', gap: 2 }}>
+                          />
+                          
+                          <Box sx={{ display: 'flex', gap: 2 }}>
                             <TextField
-                            label="Цена закупки"
-                            type="number"
-                            value={newProductForm.ценаЗакупки}
-                            onChange={(e) => handleNewProductFieldChange('ценаЗакупки', parseFloat(e.target.value) || 0)}
-                            size="small"
-                            fullWidth
-                            required
-                            InputProps={{
+                              label="Цена закупки"
+                              type="number"
+                              value={newProductForm.purchase_price}
+                              onChange={(e) => handleNumberFieldChange('purchase_price', parseFloat(e.target.value) || 0)}
+                              size="small"
+                              fullWidth
+                              required
+                              InputProps={{
                                 startAdornment: <InputAdornment position="start">₽</InputAdornment>,
-                            }}
+                              }}
                             />
                             
                             <TextField
-                            label="Цена продажи"
-                            type="number"
-                            value={newProductForm.ценаПродажи}
-                            onChange={(e) => handleNewProductFieldChange('ценаПродажи', parseFloat(e.target.value) || 0)}
-                            size="small"
-                            fullWidth
-                            required
-                            InputProps={{
+                              label="Цена продажи"
+                              type="number"
+                              value={newProductForm.sell_price}
+                              onChange={(e) => handleNumberFieldChange('sell_price', parseFloat(e.target.value) || 0)}
+                              size="small"
+                              fullWidth
+                              required
+                              InputProps={{
                                 startAdornment: <InputAdornment position="start">₽</InputAdornment>,
-                            }}
+                              }}
                             />
-                        </Box>
-                        
-                        <Box sx={{ display: 'flex', gap: 2 }}>
+                          </Box>
+                          
+                          <Box sx={{ display: 'flex', gap: 2 }}>
                             <Autocomplete
-                            freeSolo
-                            value={newProductForm.единицаИзмерения}
-                            onChange={(_, newValue) => handleNewProductFieldChange('единицаИзмерения', newValue || 'шт')}
-                            options={units}
-                            renderInput={(params) => (
+                              freeSolo
+                              value={newProductForm.unit}
+                              onChange={(_, newValue) => handleStringFieldChange('unit', newValue || 'шт')}
+                              options={units.map(u => u.name)}
+                              renderInput={(params) => (
                                 <TextField
-                                {...params}
-                                label="Ед. измерения"
-                                size="small"
-                                fullWidth
+                                  {...params}
+                                  label="Ед. измерения"
+                                  size="small"
+                                  fullWidth
                                 />
-                            )}
+                              )}
                             />
                             
                             <FormControl fullWidth size="small">
-                            <Select
-                                value={newProductForm.зонаХранения}
+                              <Select
+                                value={newProductForm.storage_zone_id || ''}
                                 required
-                                onChange={(e) => handleNewProductFieldChange('зонаХранения', e.target.value)}
-                            >
+                                onChange={(e) => {
+                                  const value = e.target.value as string;
+                                  if (value === '') {
+                                    handleStorageZoneChange(null);
+                                  } else {
+                                    const numValue = Number(value);
+                                    // Проверяем, что это валидное число (не NaN)
+                                    handleStorageZoneChange(isNaN(numValue) ? null : numValue);
+                                  }
+                                }}
+                              >
+                                <MenuItem value="">Не выбрана</MenuItem>
                                 {storageZones.map(zone => (
-                                <MenuItem key={zone} value={zone}>{zone}</MenuItem>
+                                  <MenuItem key={zone.id} value={zone.id.toString()}>{zone.наименование}</MenuItem>
                                 ))}
-                            </Select>
+                              </Select>
                             </FormControl>
-                        </Box>
-                        
-                        <Button
+                          </Box>
+                          
+                          <Button
                             variant="contained"
                             color="primary"
                             onClick={handleAddNewProduct}
-                            disabled={!newProductForm.артикул.trim() || !newProductForm.наименование.trim() }
+                            disabled={!newProductForm.article || !newProductForm.name.trim()}
                             fullWidth
-                        >
+                          >
                             Добавить новый товар в документ
-                        </Button>
+                          </Button>
                         </Stack>
-                    </Paper>
+                      </Paper>
                     </Collapse>
-                </>
+                  </>
                 )}
                 
                 {selectedProduct && (
-                <Paper sx={{ p: 2, mb: 2, bgcolor: 'info.light' }}>
+                  <Paper sx={{ p: 2, mb: 2, bgcolor: 'info.light' }}>
                     <Typography variant="subtitle2" sx={{ mb: 1 }}>
-                    <strong>Выбранный товар:</strong>
+                      <strong>Выбранный товар:</strong>
                     </Typography>
                     <Typography variant="body2">
-                    <strong>Артикул:</strong> {selectedProduct.артикул}
+                      <strong>Артикул:</strong> {selectedProduct.article}
                     </Typography>
                     <Typography variant="body2">
-                    <strong>Наименование:</strong> {selectedProduct.наименование}
+                      <strong>Наименование:</strong> {selectedProduct.name}
                     </Typography>
                     <Typography variant="body2">
-                    <strong>Категория:</strong> {selectedProduct.категория}
+                      <strong>Категория:</strong> {
+                        selectedProduct.category_id ? 
+                          categories.find(c => c.id === selectedProduct.category_id)?.name : 
+                          'Не указана'
+                      }
                     </Typography>
                     <Typography variant="body2">
-                    <strong>Цена закупки:</strong> {selectedProduct.ценаЗакупки} ₽
+                      <strong>Цена закупки:</strong> {selectedProduct.purchase_price || 0} ₽
                     </Typography>
                     <Typography variant="body2">
-                    <strong>Цена продажи:</strong> {selectedProduct.ценаПродажи} ₽
+                      <strong>Цена продажи:</strong> {selectedProduct.sell_price || 0} ₽
                     </Typography>
                     <Typography variant="body2">
-                    <strong>Остаток на складе:</strong> {selectedProduct.остаток} {selectedProduct.единицаИзмерения}
+                      <strong>Ед. измерения:</strong> {
+                        selectedProduct.unit_id ? 
+                          units.find(u => u.id === selectedProduct.unit_id)?.name : 
+                          'шт'
+                      }
                     </Typography>
-                    <Typography variant="body2">
-                    <strong>Зона хранения:</strong> {selectedProduct.зонаХранения || 'Не указана'}
-                    </Typography>
-                </Paper>
+                  </Paper>
                 )}
                 
                 <Button
-                variant="contained"
-                fullWidth
-                onClick={handleAddLine}
-                disabled={!selectedProduct}
-                sx={{ mb: 2 }}
-                startIcon={<AddCircle />}
+                  variant="contained"
+                  fullWidth
+                  onClick={handleAddLine}
+                  disabled={!selectedProduct || loading}
+                  sx={{ mb: 2 }}
+                  startIcon={<AddCircle />}
                 >
-                Добавить выбранный товар
+                  {loading ? 'Добавление...' : 'Добавить выбранный товар'}
                 </Button>
-            </Paper>
-            
-            {/* Отдельный блок статистики */}
-            <Paper sx={{ p: 2, flex: 1 }}>
+              </Paper>
+              
+              {/* Отдельный блок статистики */}
+              <Paper sx={{ p: 2, flex: 1 }}>
                 <Typography variant="subtitle1" sx={{ mb: 2, fontWeight: 600 }}>
-                <Assessment sx={{ mr: 1, verticalAlign: 'middle' }} />
-                Статистика
+                  <Assessment sx={{ mr: 1, verticalAlign: 'middle' }} />
+                  Статистика
                 </Typography>
                 
                 <Box sx={{ flexGrow: 1 }}>
-                <Stack spacing={1}>
+                  <Stack spacing={1}>
                     <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <Typography variant="body2">Товаров в документе:</Typography>
-                    <Typography variant="body2" fontWeight={600}>
+                      <Typography variant="body2">Товаров в документе:</Typography>
+                      <Typography variant="body2" fontWeight={600}>
                         {lines.length}
-                    </Typography>
+                      </Typography>
                     </Box>
                     <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <Typography variant="body2">Общее количество:</Typography>
-                    <Typography variant="body2" fontWeight={600}>
+                      <Typography variant="body2">Общее количество:</Typography>
+                      <Typography variant="body2" fontWeight={600}>
                         {totals.totalQuantity}
-                    </Typography>
+                      </Typography>
                     </Box>
                     
-                    {document.тип === 'приходная' && (
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                    {document.document_type_id === 1 && (
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
                         <Typography variant="body2">Сумма закупки:</Typography>
                         <Typography variant="body2" fontWeight={600} color="primary">
-                        {totals.totalAmount.toLocaleString('ru-RU')} ₽
+                          {totals.totalAmount.toLocaleString('ru-RU')} ₽
                         </Typography>
-                    </Box>
+                      </Box>
                     )}
                     
-                    {document.тип === 'расходная' && (
-                    <>
+                    {document.document_type_id === 2 && (
+                      <>
                         <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                        <Typography variant="body2">Сумма продажи:</Typography>
-                        <Typography variant="body2" fontWeight={600} color="primary">
+                          <Typography variant="body2">Сумма продажи:</Typography>
+                          <Typography variant="body2" fontWeight={600} color="primary">
                             {totals.totalAmount.toLocaleString('ru-RU')} ₽
-                        </Typography>
+                          </Typography>
                         </Box>
                         <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                        <Typography variant="body2">Прибыль:</Typography>
-                        <Typography variant="body2" fontWeight={600} color="success.main">
+                          <Typography variant="body2">Прибыль:</Typography>
+                          <Typography variant="body2" fontWeight={600} color="success.main">
                             {totals.profit.toLocaleString('ru-RU')} ₽
-                        </Typography>
+                          </Typography>
                         </Box>
-                    </>
+                      </>
                     )}
                     
-                    {document.тип === 'инвентаризация' && (
-                    <>
-                        <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                    {document.document_type_id === 4 && (
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
                         <Typography variant="body2">Сумма по учёту:</Typography>
                         <Typography variant="body2" fontWeight={600}>
-                            {totals.totalAmount.toLocaleString('ru-RU')} ₽
+                          {totals.totalAmount.toLocaleString('ru-RU')} ₽
                         </Typography>
-                        </Box>
-                        <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                        <Typography variant="body2">Фактическое кол-во:</Typography>
-                        <Typography variant="body2" fontWeight={600}>
-                            {totals.totalActualQuantity}
-                        </Typography>
-                        </Box>
-                        <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                        <Typography variant="body2">Расхождение:</Typography>
-                        <Typography variant="body2" fontWeight={600} color={totals.discrepancy !== 0 ? "error" : "success"}>
-                            {totals.discrepancy > 0 ? '+' : ''}{totals.discrepancy} ед.
-                        </Typography>
-                        </Box>
-                    </>
+                      </Box>
                     )}
                     
-                    {document.тип === 'списание' && (
-                    <>
-                        <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                    {document.document_type_id === 5 && (
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
                         <Typography variant="body2">Сумма на складе:</Typography>
                         <Typography variant="body2" fontWeight={600}>
-                            {totals.totalAmount.toLocaleString('ru-RU')} ₽
+                          {totals.totalAmount.toLocaleString('ru-RU')} ₽
                         </Typography>
-                        </Box>
-                        <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                        <Typography variant="body2">Сумма списания:</Typography>
-                        <Typography variant="body2" fontWeight={600} color="error.main">
-                            {totals.totalWriteOffAmount.toLocaleString('ru-RU')} ₽
-                        </Typography>
-                        </Box>
-                    </>
+                      </Box>
                     )}
                     
                     {categoriesInDocument.length > 0 && (
-                    <Box>
+                      <Box>
                         <Typography variant="body2" sx={{ mb: 0.5 }}>Категории:</Typography>
                         <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-                        {categoriesInDocument.map(category => (
+                          {categoriesInDocument.map(category => (
                             <Chip 
-                            key={category} 
-                            label={category} 
-                            size="small" 
-                            variant="outlined"
+                              key={category} 
+                              label={category} 
+                              size="small" 
+                              variant="outlined"
                             />
-                        ))}
+                          ))}
                         </Box>
-                    </Box>
+                      </Box>
                     )}
                     
                     {storageZonesInDocument.length > 0 && (
-                    <Box>
+                      <Box>
                         <Typography variant="body2" sx={{ mb: 0.5 }}>Зоны хранения:</Typography>
                         <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-                        {storageZonesInDocument.map(zone => (
+                          {storageZonesInDocument.map(zone => (
                             <Chip 
-                            key={zone} 
-                            label={zone} 
-                            size="small" 
-                            variant="outlined"
+                              key={zone} 
+                              label={zone} 
+                              size="small" 
+                              variant="outlined"
                             />
-                        ))}
+                          ))}
                         </Box>
-                    </Box>
+                      </Box>
                     )}
-                </Stack>
+                  </Stack>
                 </Box>
-            </Paper>
+              </Paper>
             </Box>
 
-          {/* Правая колонка - таблица строк документа */}
-          <Box sx={{ 
-            flex: 1,
-            minWidth: 0 
-          }}>
-            <Paper sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-              {lines.length > 0 ? (
-                <>
-                  <TableContainer sx={{ flex: 1 }}>
-                    <Table stickyHeader size="small">
-                      <TableHead>
-                        <TableRow>
-                          {renderTableHeaders()}
-                        </TableRow>
-                      </TableHead>
-                      <TableBody>
-                        {lines.map((line, index) => renderTableRow(line, index))}
-                      </TableBody>
-                      <TableFooter>
-                        {renderTableFooter()}
-                      </TableFooter>
-                    </Table>
-                  </TableContainer>
-                </>
-              ) : (
-                <Box sx={{ 
-                  flex: 1, 
-                  display: 'flex', 
-                  flexDirection: 'column', 
-                  alignItems: 'center', 
-                  justifyContent: 'center',
-                  p: 4
-                }}>
-                  <Inventory sx={{ fontSize: 64, color: 'text.disabled', mb: 2 }} />
-                  <Typography variant="h6" color="text.secondary" sx={{ mb: 1 }}>
-                    Документ пуст
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-                    Добавьте товары из списка слева
-                  </Typography>
-                </Box>
-              )}
-            </Paper>
+            {/* Правая колонка - таблица строк документа */}
+            <Box sx={{ 
+              flex: 1,
+              minWidth: 0 
+            }}>
+              <Paper sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+                {loadingLines ? (
+                  <Box sx={{ 
+                    flex: 1, 
+                    display: 'flex', 
+                    flexDirection: 'column', 
+                    alignItems: 'center', 
+                    justifyContent: 'center',
+                    p: 4
+                  }}>
+                    <CircularProgress />
+                    <Typography sx={{ mt: 2 }}>Загрузка строк документа...</Typography>
+                  </Box>
+                ) : lines.length > 0 ? (
+                  <>
+                    <TableContainer sx={{ flex: 1 }}>
+                      <Table stickyHeader size="small">
+                        <TableHead>
+                          <TableRow>
+                            {renderTableHeaders()}
+                          </TableRow>
+                        </TableHead>
+                        <TableBody>
+                          {lines.map((line, index) => renderTableRow(line, index))}
+                        </TableBody>
+                        <TableFooter>
+                          {renderTableFooter()}
+                        </TableFooter>
+                      </Table>
+                    </TableContainer>
+                  </>
+                ) : (
+                  <Box sx={{ 
+                    flex: 1, 
+                    display: 'flex', 
+                    flexDirection: 'column', 
+                    alignItems: 'center', 
+                    justifyContent: 'center',
+                    p: 4
+                  }}>
+                    <Inventory sx={{ fontSize: 64, color: 'text.disabled', mb: 2 }} />
+                    <Typography variant="h6" color="text.secondary" sx={{ mb: 1 }}>
+                      Документ пуст
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+                      Добавьте товары из списка слева
+                    </Typography>
+                  </Box>
+                )}
+              </Paper>
+            </Box>
           </Box>
-        </Box>
+        )}
       </DialogContent>
 
       <DialogActions sx={{ p: 2, justifyContent: 'space-between' }}>
         <Box>
           <Typography variant="body2" color="text.secondary">
-            <strong>Тип:</strong> {document.тип} • 
+            <strong>Тип:</strong> {getDocumentTypeName()} • 
             <strong> Строк:</strong> {lines.length} • 
             <strong> Товаров:</strong> {lines.length} ед.
           </Typography>
         </Box>
         <Box sx={{ display: 'flex', gap: 1 }}>
-          <Button onClick={onClose} variant="outlined">
+          <Button onClick={onClose} variant="outlined" disabled={loading}>
             Закрыть без сохранения
           </Button>
           <Button
@@ -1378,7 +1421,7 @@ export const DocumentLineDialog: React.FC<DocumentLineDialogProps> = ({
             variant="contained"
             color="primary"
             startIcon={<Save />}
-            disabled={lines.length === 0}
+            disabled={loading}
           >
             Сохранить документ
           </Button>
