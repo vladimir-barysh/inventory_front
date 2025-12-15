@@ -36,7 +36,7 @@ import {
 import { SecondSidebar, DocumentLineDialog, DocumentAddDialog, DocumentDeleteDialog } from './../../components';
 
 import { DocumentType, documentTypeApi, Document, documentApi, DocumentCreate, DocumentUpdate } from './makeData';
-import { Company, getCompanies } from '../../pages';
+import { Company, getCompanies, productApi, getStorageZones, Product, documentLineApi, Category, Unit, categoryApi, unitApi } from '../../pages';
 
 // Типы для категорий документов
 interface CategoryItem {
@@ -135,13 +135,28 @@ export const DocumentsPage: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedTypeId, setSelectedTypeId] = useState<number | null>(null);
 
-
   const [editingDocument, setEditingDocument] = useState<Document | null>(null);
   const [documents, setDocuments] = useState<Document[]>([]);
   const [documentTypes, setDocumentTypes] = useState<DocumentType[]>([]);       // Типы документов из бд
   const [companies, setCompanies] = useState<Company[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [storageZones, setStorageZones] = useState<any[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [units, setUnits] = useState<Unit[]>([]);
+
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Функция для обновления списка товаров
+  const handleProductsUpdated = async () => {
+    try {
+      const updatedProducts = await productApi.getAll();
+      setProducts(updatedProducts);
+      console.log('🔄 Список товаров обновлен');
+    } catch (error) {
+      console.error('Ошибка обновления списка товаров:', error);
+    }
+  };
 
   useEffect(() => {
     // Первоначальная загрузка
@@ -168,23 +183,30 @@ export const DocumentsPage: React.FC = () => {
     setError(null);
     
     try {
-      // Загружаем все данные параллельно
-      const [types, docs, comps] = await Promise.all([
+      const [types, docs, comps, prods, zones, cats, unts] = await Promise.all([
         documentTypeApi.getAll(),
         documentApi.getAll(),
-        getCompanies()
+        getCompanies(),
+        productApi.getAll(), 
+        getStorageZones(),    
+        categoryApi.getAll(), 
+        unitApi.getAll()    
       ]);
       
       setDocumentTypes(types);
       setDocuments(docs);
       setCompanies(comps);
+      setProducts(prods);
+      setStorageZones(zones);
+      setCategories(cats);
+      setUnits(unts);
     } catch (err) {
       setError('Не удалось загрузить данные');
       console.error('Ошибка загрузки данных:', err);
     } finally {
       setLoading(false);
     }
-  };
+};
 
   // Категории для сайдбара
   const categorySections: CategorySection[] = [
@@ -342,10 +364,22 @@ export const DocumentsPage: React.FC = () => {
   // Обработчик двойного клика по строке таблицы
   const handleRowDoubleClick = async (document: Document) => {
     try {
-      // Загружаем полные данные
+      // Загружаем полные данные документа
       const fullDocumentData = await documentApi.getById(document.id);
-      setSelectedDocument(fullDocumentData);
+      
+      // Загружаем строки документа
+      const documentLines = await documentLineApi.getByDocumentId(document.id);
+      
+      // Добавляем строки к документу
+      const documentWithLines = {
+        ...fullDocumentData,
+        строки: documentLines // Добавляем строки
+      };
+      
+      setSelectedDocument(documentWithLines as any); // Приведение типа
+      
     } catch (error) {
+      console.error('Ошибка загрузки документа:', error);
       setSelectedDocument(document);
     }
     
@@ -567,7 +601,7 @@ export const DocumentsPage: React.FC = () => {
         />
 
         {/* Диалог заполнения документа */}
-        {/* {selectedDocument && (
+        {selectedDocument && (
           <DocumentLineDialog
             open={fillDialogOpen}
             onClose={() => {
@@ -575,9 +609,17 @@ export const DocumentsPage: React.FC = () => {
               setSelectedDocument(null);
             }}
             document={selectedDocument}
-            onSave={handleSaveFilledDocument}
+            products={products}
+            storageZones={storageZones}
+            categories={categories}
+            units={units}
+            onSave={() => {
+              // Перезагрузить документы после сохранения строк
+              loadAllData();
+            }}
+            onProductsUpdated={handleProductsUpdated}
           />
-        )} */}
+        )}
 
         {/* Диалог подтверждения удаления */}
         <DocumentDeleteDialog

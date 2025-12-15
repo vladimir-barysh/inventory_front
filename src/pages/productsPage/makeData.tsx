@@ -29,12 +29,13 @@ export interface Product {
 }
 export type ProductFormData = Omit<Product, 'id'>;
 
+
 export interface ProductCreate {
   article: number;
   name: string;
   purchase_price: number;
   sell_price: number;
-  is_active: number;
+  is_active?: number;
   category_id: number;
   unit_id: number;
 }
