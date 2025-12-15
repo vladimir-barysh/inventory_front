@@ -1274,6 +1274,7 @@ const handleStorageZoneChange = (value: number | null) => {
                                 value={newProductForm.storage_zone_id || ''}
                                 required
                                 onChange={(e) => {
+                                  // @ts-ignore
                                   const value = e.target.value as string;
                                   if (value === '') {
                                     handleStorageZoneChange(null);
