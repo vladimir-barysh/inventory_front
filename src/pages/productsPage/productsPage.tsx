@@ -354,6 +354,7 @@ export const ProductsPage: React.FC = () => {
   const handleMenuOpen = (event: React.MouseEvent<HTMLElement>, product: Product) => {
     setAnchorEl(event.currentTarget);
     setSelectedProduct(product);
+    
   };
 
   const handleMenuClose = () => {
@@ -393,6 +394,7 @@ export const ProductsPage: React.FC = () => {
   const handleDialogSubmit = (formData: ProductFormData) => {
     if (isEditing && selectedProduct) {
       // Редактирование существующего товара
+      console.log('id employee', selectedProduct.id);
       productApi.update(selectedProduct.id, formData);
     } else {
       productApi.create(formData);

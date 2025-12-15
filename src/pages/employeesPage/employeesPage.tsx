@@ -1,5 +1,5 @@
 // src/pages/employees/EmployeesPage.tsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Box,
   Typography,
@@ -61,8 +61,12 @@ import {
   positionConfig,
   Position,
   Subdivision,
-  Role,
+  Role, employeeApi
 } from './makeData';
+import { DatePicker } from '@mui/x-date-pickers/DatePicker';
+import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
+import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
+import dayjs, { Dayjs } from 'dayjs';
 import AdminOnly from '../../components/AdminOnly';
 
 // Компонент для отображения роли
@@ -141,8 +145,10 @@ const EmployeeDialog: React.FC<EmployeeDialogProps> = ({
   subdivisionsList,
   rolesList
 }) => {
-  const [formData, setFormData] = useState<EmployeeFormData>(
-    initialData || {
+  const formData = React.useMemo(() => {
+      return initialData || {
+      login: '',
+      password: '',
       фамилия: '',
       имя: '',
       email: '',
@@ -154,7 +160,9 @@ const EmployeeDialog: React.FC<EmployeeDialogProps> = ({
       должность: '',
       подразделение: '',
     }
-  );
+  }, [initialData, open]);
+  
+  const [localData, setLocalData] = useState<EmployeeFormData>(formData);
   const [errors, setErrors] = useState<Partial<Record<keyof EmployeeFormData, string>>>({});
 
   const validateForm = (): boolean => {
@@ -174,8 +182,8 @@ const EmployeeDialog: React.FC<EmployeeDialogProps> = ({
     if (!formData.номерПаспорта.trim()) newErrors.номерПаспорта = 'Обязательное поле';
     else if (!/^\d{6}$/.test(formData.номерПаспорта)) newErrors.номерПаспорта = '6 цифр';
     
-    if (!formData.датаРождения.trim()) newErrors.датаРождения = 'Обязательное поле';
-    else if (!/^\d{2}\.\d{2}\.\d{4}$/.test(formData.датаРождения)) newErrors.датаРождения = 'Формат: дд.мм.гггг';
+    //if (!formData.датаРождения.trim()) newErrors.датаРождения = 'Обязательное поле';
+    //else if (!/^\d{2}\.\d{2}\.\d{4}$/.test(formData.датаРождения)) newErrors.датаРождения = 'Формат: дд.мм.гггг';
     
     if (!formData.роль) newErrors.роль = 'Обязательное поле';
     if (!formData.должность) newErrors.должность = 'Обязательное поле';
@@ -185,20 +193,38 @@ const EmployeeDialog: React.FC<EmployeeDialogProps> = ({
     return Object.keys(newErrors).length === 0;
   };
 
-   const handleChange = (field: keyof EmployeeFormData, value: string) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
-    // Очищаем ошибку при изменении поля
+  useEffect(() => {
+    console.log('🔄 Обновляем localData с новыми данными:', formData);
+    setLocalData(formData);
+  }, [formData]);
+
+  const handleChange = (field: keyof EmployeeFormData, value: string | number) => {
+    console.log(`📝 Изменение поля ${field}:`, value);
+    setLocalData(prev => ({ ...prev, [field]: value }));
     if (errors[field]) {
-      setErrors(prev => ({ ...prev, [field]: undefined }));
-    }
+    setErrors(prev => ({ ...prev, [field]: undefined }));
+  }
   };
 
   const handleSubmit = () => {
     if (validateForm()) {
-      onSubmit(formData);
+      onSubmit(localData);
       onClose();
     }
   };
+
+  function formatDate(dateStr: string): string {
+    if (!dateStr) return '';
+    
+    // Разделяем строку "2023-12-25" на части
+    const [year, month, day] = dateStr.split('-');
+    
+    // Проверяем, что все части существуют
+    if (!year || !month || !day) return dateStr;
+    
+    // Форматируем как "dd-mm-yyyy"
+    return `${day}.${month}.${year}`;
+  }
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
@@ -210,11 +236,40 @@ const EmployeeDialog: React.FC<EmployeeDialogProps> = ({
       </DialogTitle>
       <DialogContent>
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, pt: 2 }}>
+          {isEdit && (
+            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)' }, gap: 2 }}>
+              <TextField
+                label="Логин *"
+                value={localData.login}
+                onChange={(e) => handleChange('login', e.target.value)}
+                fullWidth
+                required
+                error={!!errors.login}
+                helperText={errors.login}
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <Person fontSize="small" />
+                    </InputAdornment>
+                  ),
+                }}
+              />
+              <TextField
+                label="Пароль *"
+                value={localData.password}
+                onChange={(e) => handleChange('password', e.target.value)}
+                fullWidth
+                required
+                error={!!errors.password}
+                helperText={errors.password}
+              />
+          </Box>
+          )}
           <Typography variant="subtitle1" fontWeight={600}>Личные данные</Typography>
           <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)' }, gap: 2 }}>
             <TextField
               label="Фамилия *"
-              value={formData.фамилия}
+              value={localData.фамилия}
               onChange={(e) => handleChange('фамилия', e.target.value)}
               fullWidth
               required
@@ -230,7 +285,7 @@ const EmployeeDialog: React.FC<EmployeeDialogProps> = ({
             />
             <TextField
               label="Имя *"
-              value={formData.имя}
+              value={localData.имя}
               onChange={(e) => handleChange('имя', e.target.value)}
               fullWidth
               required
@@ -242,7 +297,7 @@ const EmployeeDialog: React.FC<EmployeeDialogProps> = ({
           <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(3, 1fr)' }, gap: 2 }}>
             <TextField
               label="Серия паспорта *"
-              value={formData.серияПаспорта}
+              value={localData.серияПаспорта}
               onChange={(e) => handleChange('серияПаспорта', e.target.value)}
               fullWidth
               error={!!errors.серияПаспорта}
@@ -258,7 +313,7 @@ const EmployeeDialog: React.FC<EmployeeDialogProps> = ({
             />
             <TextField
               label="Номер паспорта *"
-              value={formData.номерПаспорта}
+              value={localData.номерПаспорта}
               onChange={(e) => handleChange('номерПаспорта', e.target.value)}
               fullWidth
               error={!!errors.номерПаспорта}
@@ -267,7 +322,7 @@ const EmployeeDialog: React.FC<EmployeeDialogProps> = ({
             />
             <TextField
               label="Дата рождения *"
-              value={formData.датаРождения}
+              value={formatDate(localData.датаРождения)}
               onChange={(e) => handleChange('датаРождения', e.target.value)}
               fullWidth
               placeholder="дд.мм.гггг"
@@ -289,7 +344,7 @@ const EmployeeDialog: React.FC<EmployeeDialogProps> = ({
             <TextField
               label="Email *"
               type="email"
-              value={formData.email}
+              value={localData.email}
               onChange={(e) => handleChange('email', e.target.value)}
               fullWidth
               error={!!errors.email}
@@ -304,7 +359,7 @@ const EmployeeDialog: React.FC<EmployeeDialogProps> = ({
             />
             <TextField
               label="Телефон *"
-              value={formData.телефон}
+              value={localData.телефон}
               onChange={(e) => handleChange('телефон', e.target.value)}
               fullWidth
               error={!!errors.телефон}
@@ -340,7 +395,7 @@ const EmployeeDialog: React.FC<EmployeeDialogProps> = ({
             <FormControl fullWidth required error={!!errors.должность}>
               <InputLabel>Должность *</InputLabel>
               <Select
-                value={formData.должность}
+                value={localData.должность}
                 label="Должность *"
                 onChange={(e) => handleChange('должность', e.target.value)}
               >
@@ -358,7 +413,7 @@ const EmployeeDialog: React.FC<EmployeeDialogProps> = ({
             <FormControl fullWidth required error={!!errors.подразделение}>
               <InputLabel>Подразделение *</InputLabel>
               <Select
-                value={formData.подразделение}
+                value={localData.подразделение}
                 label="Подразделение *"
                 onChange={(e) => handleChange('подразделение', e.target.value)}
               >
@@ -464,45 +519,125 @@ export const EmployeesPage: React.FC = () => {
   const handleMenuOpen = (event: React.MouseEvent<HTMLElement>, employee: Employee) => {
     setAnchorEl(event.currentTarget);
     setSelectedEmployee(employee);
+    
   };
 
   const handleMenuClose = () => {
     setAnchorEl(null);
-    setSelectedEmployee(null);
   };
 
   const handleAddEmployee = () => {
+    setSelectedEmployee(null);
     setIsEditing(false);
     setDialogOpen(true);
   };
 
   const handleEditEmployee = () => {
+    if (!selectedEmployee) {
+      return;
+    }
+    
     setIsEditing(true);
     setDialogOpen(true);
-    handleMenuClose();
+    setAnchorEl(null);
   };
 
   const handleDeleteClick = () => {
     setDeleteDialogOpen(true);
-    handleMenuClose();
+    setAnchorEl(null);
   };
 
-  const handleDeleteConfirm = () => {
-    if (selectedEmployee) {
-      setEmployees(prev => prev.filter(e => e.id !== selectedEmployee.id));
+  const handleDeleteConfirm = async () => {
+    if (!selectedEmployee?.id) {
+      console.error('Не выбран сотрудник для удаления');
+      return;
     }
-    setDeleteDialogOpen(false);
-    setSelectedEmployee(null);
+    
+    console.log('🗑️ Удаление сотрудника ID:', selectedEmployee.id);
+    
+    try {
+      
+      await employeeApi.delete(selectedEmployee.id);
+      
+      console.log('✅ Сотрудник удален');
+      
+      // Удаляем из локального состояния
+      setEmployees(prev => prev.filter(emp => emp.id !== selectedEmployee.id));
+      
+      // Закрываем диалог
+      setDeleteDialogOpen(false);
+      setSelectedEmployee(null);
+      
+    } catch (error: any) {
+      console.error('❌ Ошибка удаления:', error);
+      alert(`Ошибка удаления: ${error.message}`);
+    } 
+  };
+
+  const findRoleId = (employee: EmployeeFormData) => {
+    const foundRole = rolesList.find(r => {
+      const roleName = r.name;
+      return roleName === employee.роль;
+    });
+
+    return foundRole?.id;
+  };
+  const findSubDivisionId = (employee: EmployeeFormData) => {
+    const foundSubdivision = subdivisionsList.find(s => {
+      const subdivisionName = s.name;
+      return subdivisionName === employee.подразделение;
+    });
+
+    return foundSubdivision?.id;
+  };
+  const findPositionId = (employee: EmployeeFormData) => {
+    const foundPosition = positionsList.find(p => {
+      const positionName = p.name;
+      return positionName === employee.должность;
+    });
+
+    return foundPosition?.id;
   };
 
   const handleDialogSubmit = async (formData: EmployeeFormData) => {
+
     if (isEditing && selectedEmployee) {
-      // Редактирование существующего сотрудника
-      setEmployees(prev => prev.map(e => 
-        e.id === selectedEmployee.id 
-          ? { ...e, ...formData }
-          : e
-      ));
+      try {
+        console.log('📤 Отправляем обновление для ID:', selectedEmployee.id);
+        
+        // Вызываем API обновления
+        await employeeApi.update(selectedEmployee.id, formData);
+        
+        console.log('✅ Сотрудник успешно обновлен');
+        
+        // Обновляем локальное состояние
+        setEmployees(prev => prev.map(emp => 
+          emp.id === selectedEmployee.id 
+            ? { 
+                ...emp, 
+                ...formData,
+                // Обновляем отображаемые поля
+                фамилия: formData.фамилия,
+                имя: formData.имя,
+                email: formData.email,
+                телефон: formData.телефон,
+                серияПаспорта: formData.серияПаспорта,
+                номерПаспорта: formData.номерПаспорта,
+                датаРождения: formData.датаРождения,
+                роль: formData.роль,
+                должность: formData.должность,
+                подразделение: formData.подразделение,
+              }
+            : emp
+        ));
+        
+        // Закрываем диалог и показываем уведомление
+        setDialogOpen(false);
+        
+      } catch (error: any) {
+        console.error('❌ Ошибка обновления:', error);
+        alert(`Ошибка обновления: ${error.message}`);
+      }
     } else {
       const [roles, positions, subdivisions] = await Promise.all([
         getRoles(),
@@ -517,6 +652,8 @@ export const EmployeesPage: React.FC = () => {
       
       const newEmployee: Employee = {
         id: newEmployeeFromServer.id,
+        login: formData.login,
+        password: formData.password,
         фамилия: formData.фамилия,
         имя: formData.имя,
         email: formData.email,
@@ -533,7 +670,36 @@ export const EmployeesPage: React.FC = () => {
     }
   };
 
+  const convertToFormData = (employee: Employee): EmployeeFormData => {
+    return {
+      login: employee.login,
+      password: employee.password,
+      фамилия: employee.фамилия,
+      имя: employee.имя,
+      email: employee.email,
+      телефон: employee.телефон,
+      серияПаспорта: employee.серияПаспорта,
+      номерПаспорта: employee.номерПаспорта,
+      датаРождения: employee.датаРождения,
+      роль: employee.роль,
+      должность: employee.должность,
+      подразделение: employee.подразделение,
+    };
+  };
+
+  function formatDate(dateStr: string): string {
+  if (!dateStr) return '';
   
+  // Разделяем строку "2023-12-25" на части
+  const [year, month, day] = dateStr.split('-');
+  
+  // Проверяем, что все части существуют
+  if (!year || !month || !day) return dateStr;
+  
+  // Форматируем как "dd-mm-yyyy"
+  return `${day}.${month}.${year}`;
+}
+
   return (
     <Box>
       {/* Заголовок и панель управления */}
@@ -616,13 +782,13 @@ export const EmployeesPage: React.FC = () => {
           <Table stickyHeader>
             <TableHead>
               <TableRow>
-                <TableCell>ФИО</TableCell>
+                <TableCell>Имя</TableCell>
                 <TableCell>Должность</TableCell>
                 <TableCell>Роль</TableCell>
                 <TableCell>Подразделение</TableCell>
                 <TableCell>Контакты</TableCell>
-                <TableCell>Паспорт</TableCell>
                 <AdminOnly>
+                  <TableCell>Паспорт</TableCell>
                   <TableCell align="right">Действия</TableCell>
                 </AdminOnly>
               </TableRow>
@@ -640,10 +806,13 @@ export const EmployeesPage: React.FC = () => {
                     <TableCell>
                       <Box>
                         <Typography fontWeight={600}>
-                          {employee.фамилия} {employee.имя}                         </Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          {employee.датаРождения}
+                          {employee.фамилия} {employee.имя}                         
                         </Typography>
+                        <AdminOnly>
+                          <Typography variant="caption" color="text.secondary">
+                            {formatDate(employee.датаРождения)}
+                          </Typography>
+                        </AdminOnly>
                       </Box>
                     </TableCell>
                     <TableCell>
@@ -667,12 +836,13 @@ export const EmployeesPage: React.FC = () => {
                         </Typography>
                       </Box>
                     </TableCell>
-                    <TableCell>
-                      <Typography variant="body2">
-                        {employee.серияПаспорта} {employee.номерПаспорта}
-                      </Typography>
-                    </TableCell>
                     <AdminOnly>
+                      <TableCell>
+                        <Typography variant="body2">
+                          {employee.серияПаспорта} {employee.номерПаспорта}
+                        </Typography>
+                      </TableCell>
+                    
                       <TableCell align="right">
                         <IconButton
                           size="small"
@@ -762,24 +932,16 @@ export const EmployeesPage: React.FC = () => {
       {/* Диалог добавления/редактирования */}
       <EmployeeDialog
         open={dialogOpen}
-        onClose={() => setDialogOpen(false)}
+        onClose={() => {
+          setDialogOpen(false);
+          setSelectedEmployee(null);
+        }}
         onSubmit={handleDialogSubmit}
+        initialData={selectedEmployee ? convertToFormData(selectedEmployee) : undefined}
         isEdit={isEditing}
         positionsList={positionsList}
         subdivisionsList={subdivisionsList}
         rolesList={rolesList}
-        initialData={isEditing && selectedEmployee ? {
-          фамилия: selectedEmployee.фамилия,
-          имя: selectedEmployee.имя,
-          email: selectedEmployee.email,
-          телефон: selectedEmployee.телефон,
-          серияПаспорта: selectedEmployee.серияПаспорта,
-          номерПаспорта: selectedEmployee.номерПаспорта,
-          датаРождения: selectedEmployee.датаРождения,
-          роль: selectedEmployee.роль,
-          должность: selectedEmployee.должность,
-          подразделение: selectedEmployee.подразделение,
-        } : undefined}
       />
 
       {/* Диалог подтверждения удаления */}
