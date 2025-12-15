@@ -48,7 +48,9 @@ import {
   DocumentLine,
   Category,
   StorageZone,
-  Unit 
+  Unit,
+  ProductCreate,
+  productApi
 } from '../../../pages';
 
 // Диалог для заполнения документа строками
@@ -61,6 +63,7 @@ interface DocumentLineDialogProps {
   categories: Category[]; 
   units: Unit[];         
   onSave: () => void;
+  onProductsUpdated?: () => void;
 }
 
 // Расширенный интерфейс для отображения строки документа с дополнительной информацией
@@ -95,7 +98,8 @@ export const DocumentLineDialog: React.FC<DocumentLineDialogProps> = ({
   storageZones,
   categories,
   units, 
-  onSave
+  onSave,
+  onProductsUpdated,
 }) => {
   const [lines, setLines] = useState<EnhancedDocumentLine[]>([]);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
@@ -119,95 +123,170 @@ export const DocumentLineDialog: React.FC<DocumentLineDialogProps> = ({
     }
   }, [open, document.id]);
 
-
-
-  
   const loadDocumentLines = async () => {
-  setLoadingLines(true);
-  try {
-    console.log('📡 Загрузка строк документа ID:', document.id);
-    
-    const response = await documentLineApi.getByDocumentId(document.id);
-    console.log('📦 Ответ API:', response);
-    
-    // Проверяем структуру ответа
-    if (!response) {
-      console.error('❌ Пустой ответ от API');
-      setLines([]);
-      return;
-    }
-    
-    let linesArray: DocumentLine[] = [];
-    
-    // Обработка разных структур ответа
-    if (Array.isArray(response)) {
-      // Если API возвращает массив напрямую
-      linesArray = response;
-    } else if (response.lines && Array.isArray(response.lines)) {
-      // Если API возвращает объект с полем lines (DocumentLinesResponse)
-      linesArray = response.lines;
-    } else if (Array.isArray((response as any).data)) {
-      // Если есть поле data (на всякий случай)
-      linesArray = (response as any).data;
-    } else {
-      console.error('❌ Неизвестная структура ответа:', response);
-      setLines([]);
-      return;
-    }
-    
-    console.log(`✅ Получено строк: ${linesArray.length}`);
-    console.log('📋 Строки:', linesArray);
-    
-    // Обогащаем данные
-    const enhancedLines: EnhancedDocumentLine[] = linesArray.map(line => {
-      const product = products.find(p => p.id === line.product_id);
-      const storageZoneSender = line.storage_zone_sender_id ? 
-        storageZones.find(z => z.id === line.storage_zone_sender_id) : undefined;
-      const storageZoneReceiver = line.storage_zone_receiver_id ? 
-        storageZones.find(z => z.id === line.storage_zone_receiver_id) : undefined;
-
-      const categoryName = product?.category_id ? 
-        categories.find(c => c.id === product.category_id)?.name : undefined;
+    setLoadingLines(true);
+    try {
+      const response = await documentLineApi.getByDocumentId(document.id);
       
-      const unitName = product?.unit_id ? 
-        units.find(u => u.id === product.unit_id)?.name : undefined;
+      // Проверяем структуру ответа
+      if (!response) {
+        console.error('Пустой ответ от API');
+        setLines([]);
+        return;
+      }
+      
+      let linesArray: DocumentLine[] = [];
+      
+      // Обработка разных структур ответа
+      if (Array.isArray(response)) {
+        // Если API возвращает массив напрямую
+        linesArray = response;
+      } else if (response.lines && Array.isArray(response.lines)) {
+        // Если API возвращает объект с полем lines (DocumentLinesResponse)
+        linesArray = response.lines;
+      } else if (Array.isArray((response as any).data)) {
+        // Если есть поле data (на всякий случай)
+        linesArray = (response as any).data;
+      } else {
+        console.error(' Неизвестная структура ответа:', response);
+        setLines([]);
+        return;
+      }
+      
+      console.log(`Получено строк: ${linesArray.length}`);
+      console.log('Строки:', linesArray);
+      
+      // Обогащаем данные
+      const enhancedLines: EnhancedDocumentLine[] = linesArray.map(line => {
+        const product = products.find(p => p.id === line.product_id);
+        const storageZoneSender = line.storage_zone_sender_id ? 
+          storageZones.find(z => z.id === line.storage_zone_sender_id) : undefined;
+        const storageZoneReceiver = line.storage_zone_receiver_id ? 
+          storageZones.find(z => z.id === line.storage_zone_receiver_id) : undefined;
 
-      return {
-        ...line,
-        product,
-        storageZoneSender,
-        storageZoneReceiver,
-        purchase_price: product?.purchase_price,
-        sell_price: product?.sell_price,
-        article: product?.article,
-        name: product?.name,
-        category: categoryName,
-        unit: unitName,
-      };
-    });
-    
-    console.log('✨ Обогащенные строки:', enhancedLines);
-    setLines(enhancedLines);
-    
-  } catch (error) {
-    console.error('❌ Ошибка загрузки строк документа:', error);
-    alert('Не удалось загрузить строки документа');
-    setLines([]);
-  } finally {
-    setLoadingLines(false);
+        const categoryName = product?.category_id ? 
+          categories.find(c => c.id === product.category_id)?.name : undefined;
+        
+        const unitName = product?.unit_id ? 
+          units.find(u => u.id === product.unit_id)?.name : undefined;
+
+        return {
+          ...line,
+          product,
+          storageZoneSender,
+          storageZoneReceiver,
+          purchase_price: product?.purchase_price,
+          sell_price: product?.sell_price,
+          article: product?.article,
+          name: product?.name,
+          category: categoryName,
+          unit: unitName,
+        };
+      });
+      setLines(enhancedLines);
+      
+    } catch (error) {
+      alert('Не удалось загрузить строки документа');
+      setLines([]);
+    } finally {
+      setLoadingLines(false);
+    }
+  };
+
+  // Один интерфейс для всех ответов сервера
+  interface ApiResponse<T = any> {
+  success: boolean;
+  message: string | number;
+  data?: T;
   }
-};
 
-  const handleAddNewProduct = () => {
-      if (!newProductForm.article || !newProductForm.name.trim()) {
-        alert('Заполните артикул и наименование товара');
+  const handleAddNewProduct = async () => {
+    // Валидация
+    if (!newProductForm.article || !newProductForm.name.trim()) {
+      alert('Заполните артикул и наименование товара');
+      return;
+    }
+
+    if (!newProductForm.category) {
+      alert('Выберите категорию товара');
+      return;
+    }
+
+    if (!newProductForm.unit) {
+      alert('Выберите единицу измерения');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      
+      // 1. Находим ID категории по названию
+      const category = categories.find(c => c.name === newProductForm.category);
+      if (!category) {
+        alert('Категория не найдена в базе данных');
         return;
       }
 
-      // В реальном приложении здесь будет вызов API для создания товара
-      alert('Создание нового товара через API еще не реализовано');
+      // 2. Находим ID единицы измерения по названию
+      const unit = units.find(u => u.name === newProductForm.unit);
+      if (!unit) {
+        alert('Единица измерения не найдена в базе данных');
+        return;
+      }
+
+      // 3. Подготавливаем данные для создания товара
+      const productData: ProductCreate = {
+        article: newProductForm.article,
+        name: newProductForm.name.trim(),
+        purchase_price: newProductForm.purchase_price || 0,
+        sell_price: newProductForm.sell_price || 0,
+        category_id: category.id,
+        unit_id: unit.id
+      };
+
+      // 4. Создаем товар через API
+      const productResponse = await productApi.create(productData) as unknown as ApiResponse<number>;
+
+      // 5. Получаем ID созданного товара
+      const productId = productResponse.message; // message содержит ID
       
-      // Сбрасываем форму
+      if (!productId) {
+        console.error('Не удалось получить ID созданного товара');
+        alert('Ошибка: не удалось получить идентификатор созданного товара');
+        return;
+      }
+
+      // 6. Автоматически добавляем товар в документ
+      const lineData: DocumentLineCreate = {
+        document_id: document.id,
+        product_id: productId as number,
+        quantity: 1,
+        actual_quantity: 1,
+        storage_zone_sender_id: undefined,
+        storage_zone_receiver_id: undefined
+      };
+
+      // 7. Заполняем зону хранения для приходных накладных
+      if (document.document_type_id === 1 && newProductForm.storage_zone_id) {
+        lineData.storage_zone_receiver_id = newProductForm.storage_zone_id;
+      }
+
+      // 8. Добавляем строку документа
+      const lineResponse = await documentLineApi.create(lineData);
+      console.log('Товар добавлен в документ:', lineResponse);
+
+      // 9. Уведомляем родительский компонент об обновлении товаров
+      if (onProductsUpdated) {
+        onProductsUpdated();
+      }
+      
+      // Задержка
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
+      // 10 Обновляем список строк документа
+      await loadDocumentLines();
+
+      // 11.брасываем форму
       setNewProductForm({
         article: 0,
         name: '',
@@ -219,25 +298,70 @@ export const DocumentLineDialog: React.FC<DocumentLineDialogProps> = ({
       });
       
       setShowNewProductForm(false);
-    };
 
-    const handleAddLine = async () => {
+    } catch (error: any) {
+      console.error('Ошибка создания товара:', error);
+      
+      let errorMessage = 'Ошибка создания товара';
+      if (error.response?.data?.detail) {
+        errorMessage = error.response.data.detail;
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      alert(`Ошибка: ${errorMessage}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+const validateNewProductForm = (): boolean => {
+    const errors = [];
+    
+    if (!newProductForm.article || newProductForm.article <= 0) {
+      errors.push('Артикул должен быть положительным числом');
+    }
+    
+    if (!newProductForm.name.trim()) {
+      errors.push('Введите наименование товара');
+    }
+    
+    if (!newProductForm.category) {
+      errors.push('Выберите категорию');
+    }
+    
+    if (!newProductForm.unit) {
+      errors.push('Выберите единицу измерения');
+    }
+    
+    if (newProductForm.purchase_price < 0) {
+      errors.push('Цена закупки не может быть отрицательной');
+    }
+    
+    if (newProductForm.sell_price < 0) {
+      errors.push('Цена продажи не может быть отрицательной');
+    }
+    
+    if (errors.length > 0) {
+      alert(errors.join('\n'));
+      return false;
+    }
+    
+    return true;
+  };
+
+  const handleAddLine = async () => {
     if (!selectedProduct) {
       alert('Выберите товар для добавления');
       return;
     }
-
-    console.log('➕ === НАЧАЛО ДОБАВЛЕНИЯ СТРОКИ ===');
-    console.log('📦 Выбранный товар:', selectedProduct);
-    console.log('📄 Документ:', document);
-    console.log('🏷️ Тип документа:', document.document_type_id);
 
     // Создаем объект для отправки
     const lineData: DocumentLineCreate = {
       document_id: document.id,
       product_id: selectedProduct.id,
       quantity: 1,
-      actual_quantity: 1, // ← ВАЖНО: передаем actual_quantity
+      actual_quantity: 1,
       storage_zone_sender_id: undefined,
       storage_zone_receiver_id: undefined
     };
@@ -248,37 +372,29 @@ export const DocumentLineDialog: React.FC<DocumentLineDialogProps> = ({
         const receiverZoneId = newProductForm.storage_zone_id || 
           (storageZones.length > 0 ? storageZones[0].id : null);
         lineData.storage_zone_receiver_id = receiverZoneId;
-        console.log('📥 Приход: зона приемки ID:', receiverZoneId);
         break;
       
       case 2: // Расход
         const senderZoneId = storageZones.length > 0 ? storageZones[0].id : null;
         lineData.storage_zone_sender_id = senderZoneId;
-        console.log('📤 Расход: зона отгрузки ID:', senderZoneId);
         break;
       
       case 3: // Перемещение
         lineData.storage_zone_sender_id = storageZones.length > 0 ? storageZones[0].id : null;
         lineData.storage_zone_receiver_id = storageZones.length > 1 ? storageZones[1].id : 
           (storageZones.length > 0 ? storageZones[0].id : null);
-        console.log('🔄 Перемещение: откуда ID', lineData.storage_zone_sender_id, 
-                    'куда ID', lineData.storage_zone_receiver_id);
         break;
       
       case 4: // Инвентаризация
         // Для инвентаризации нужно получать текущее количество из БД
-        console.log('📊 Инвентаризация: зоны хранения не нужны');
-        // Можно оставить поля undefined или null
         break;
       
       case 5: // Списание
         const writeOffZoneId = storageZones.length > 0 ? storageZones[0].id : null;
         lineData.storage_zone_sender_id = writeOffZoneId;
-        console.log('🗑️ Списание: зона списания ID:', writeOffZoneId);
         break;
     }
 
-    // Если значения null, лучше установить undefined
     if (lineData.storage_zone_sender_id === null) {
       lineData.storage_zone_sender_id = undefined;
     }
@@ -286,16 +402,11 @@ export const DocumentLineDialog: React.FC<DocumentLineDialogProps> = ({
       lineData.storage_zone_receiver_id = undefined;
     }
 
-    console.log('📤 Данные для отправки на сервер:');
-    console.log(JSON.stringify(lineData, null, 2));
-
     try {
       setLoading(true);
       
       // Отправляем данные через API
-      console.log('📡 Отправка через documentLineApi.create...');
       const response = await documentLineApi.create(lineData);
-      console.log('✅ Ответ от API:', response);
       
       // Проверяем ответ
       if (response) {
@@ -307,7 +418,7 @@ export const DocumentLineDialog: React.FC<DocumentLineDialogProps> = ({
       }
       
     } catch (error: any) {
-      console.error('❌ ПОЛНАЯ ОШИБКА:');
+      console.error('ПОЛНАЯ ОШИБКА:');
       console.error('Сообщение:', error.message);
       console.error('Статус:', error.response?.status);
       console.error('Данные ошибки:', error.response?.data);
@@ -1184,11 +1295,15 @@ const handleStorageZoneChange = (value: number | null) => {
                           <Button
                             variant="contained"
                             color="primary"
-                            onClick={handleAddNewProduct}
-                            disabled={!newProductForm.article || !newProductForm.name.trim()}
+                            onClick={() => {
+                              if (validateNewProductForm()) {
+                                handleAddNewProduct();
+                              }
+                            }}
+                            disabled={!newProductForm.article || !newProductForm.name.trim() || loading}
                             fullWidth
                           >
-                            Добавить новый товар в документ
+                            {loading ? 'Создание...' : 'Создать товар и добавить в документ'}
                           </Button>
                         </Stack>
                       </Paper>

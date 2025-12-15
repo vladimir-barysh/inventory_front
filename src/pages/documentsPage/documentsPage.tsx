@@ -147,6 +147,17 @@ export const DocumentsPage: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Функция для обновления списка товаров
+  const handleProductsUpdated = async () => {
+    try {
+      const updatedProducts = await productApi.getAll();
+      setProducts(updatedProducts);
+      console.log('🔄 Список товаров обновлен');
+    } catch (error) {
+      console.error('Ошибка обновления списка товаров:', error);
+    }
+  };
+
   useEffect(() => {
     // Первоначальная загрузка
     loadAllData();
@@ -606,6 +617,7 @@ export const DocumentsPage: React.FC = () => {
               // Перезагрузить документы после сохранения строк
               loadAllData();
             }}
+            onProductsUpdated={handleProductsUpdated}
           />
         )}
 
