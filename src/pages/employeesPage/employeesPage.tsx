@@ -379,7 +379,7 @@ const EmployeeDialog: React.FC<EmployeeDialogProps> = ({
             <FormControl fullWidth required error={!!errors.роль}>
               <InputLabel>Роль *</InputLabel>
               <Select
-                value={formData.роль}
+                value={localData.роль}
                 label="Роль *"
                 onChange={(e) => handleChange('роль', e.target.value)}
               >
