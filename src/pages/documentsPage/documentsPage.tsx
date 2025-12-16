@@ -333,8 +333,20 @@ export const DocumentsPage: React.FC = () => {
         ));
         
       } else {
-        const newDocument = await documentApi.create(formData);
-        setDocuments(prev => [...prev, newDocument]);
+        
+        switch (formData.document_type_id){
+          case 4: {
+            const newInvDoc = await documentApi.createInvDoc(formData);
+            setDocuments(prev => [...prev, newInvDoc]);
+            break;
+          }
+          default: {
+            const newDocument = await documentApi.create(formData);
+            setDocuments(prev => [...prev, newDocument]);
+            break;
+          }
+        };
+        
       }
       
       // Закрываем диалог и сбрасываем состояния
@@ -598,6 +610,7 @@ export const DocumentsPage: React.FC = () => {
           isEdit={isEditing}
           suppliers={companies}
           documentTypes={documentTypes}
+          storageZones={storageZones}
         />
 
         {/* Диалог заполнения документа */}

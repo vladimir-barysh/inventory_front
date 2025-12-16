@@ -20,7 +20,8 @@ import {
   DateRange,
   Comment,
 } from '@mui/icons-material';
-import { DocumentType, Company, Document, DocumentCreate} from './../../../pages';
+import { StorageZone, DocumentType, Company, Document, DocumentCreate} from './../../../pages';
+import { getCurrentUser } from 'pages/authPage/authContext';
 
 export interface DocumentAddDialogProps {
   open: boolean;
@@ -30,6 +31,8 @@ export interface DocumentAddDialogProps {
   isEdit?: boolean;
   suppliers?: Company[];
   documentTypes: DocumentType[];
+
+  storageZones: StorageZone[];
 }
 
 export const DocumentAddDialog: React.FC<DocumentAddDialogProps> = ({
@@ -40,11 +43,13 @@ export const DocumentAddDialog: React.FC<DocumentAddDialogProps> = ({
   isEdit = false,
   suppliers = [],
   documentTypes,
+  storageZones,
 }) => {
   // Инициализация формы
   type FormData = Omit<DocumentCreate, 'comment'> & {
     comment?: string;
   };
+  const currUser = getCurrentUser();
 
   const [formData, setFormData] = useState<FormData>({
     number: '',
@@ -52,9 +57,24 @@ export const DocumentAddDialog: React.FC<DocumentAddDialogProps> = ({
     comment: '',
     company_id: undefined,
     document_type_id: documentTypes[0]?.id || 1,
+    zone_id: storageZones[0]?.id || 1,
+    employee_id: currUser?.id,
   });
 
   const [selectedSupplier, setSelectedSupplier] = useState<Company | null>(null);
+
+  const [selectedZone, setSelectedZone] = useState<StorageZone | null>(null);
+  const [selectedEmployee, setSelectedEmployee] = useState<{id: number, name: string} | null>(null);
+  
+  // Состояния для дополнительных полей по типам документов
+  const [additionalData, setAdditionalData] = useState({
+    // Для инвентаризации
+    inventory: { zone_id: 0, employee_id: 0 },
+    // Для накладных
+    invoice: { invoice_number: '', amount: 0, currency: 'RUB' },
+    // Для договоров
+    contract: { contract_number: '', valid_from: '', valid_to: '' },
+  });
 
   // Эффект для обновления формы
   useEffect(() => {
@@ -65,6 +85,8 @@ export const DocumentAddDialog: React.FC<DocumentAddDialogProps> = ({
         comment: initialData.comment || '',
         company_id: initialData.company_id,
         document_type_id: initialData.document_type_id || documentTypes[0]?.id || 1,
+        zone_id: initialData.zone_id,
+        employee_id: initialData.employee_id,
       });
 
       // Находим поставщика по ID
@@ -82,10 +104,24 @@ export const DocumentAddDialog: React.FC<DocumentAddDialogProps> = ({
         comment: '',
         company_id: undefined,
         document_type_id: documentTypes[0]?.id || 1,
+        zone_id: 1,
+        employee_id: currUser?.id,
       });
       setSelectedSupplier(null);
+      setSelectedZone(null);
+      setSelectedEmployee(null);
+      setAdditionalData({
+        inventory: { zone_id: 0, employee_id: 0 },
+        invoice: { invoice_number: '', amount: 0, currency: 'RUB' },
+        contract: { contract_number: '', valid_from: '', valid_to: '' },
+      });
     }
   }, [initialData, suppliers, documentTypes, open]);
+
+  // Определяем, какой тип документа выбран
+  const getSelectedDocumentType = () => {
+    return documentTypes.find(type => type.id === formData.document_type_id);
+  };
 
   const handleChange = (field: keyof DocumentCreate, value: string | number | undefined) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -103,8 +139,10 @@ export const DocumentAddDialog: React.FC<DocumentAddDialogProps> = ({
       comment: formData.comment?.trim() || undefined,
       company_id: formData.company_id,
       document_type_id: formData.document_type_id,
+      zone_id: formData.zone_id,
+      employee_id: formData.employee_id
     };
-    
+
     onSubmit(formattedData);
   };
 
@@ -122,7 +160,7 @@ export const DocumentAddDialog: React.FC<DocumentAddDialogProps> = ({
           <Box sx={{ display: 'flex', gap: 2 }}>
             <TextField
               label="Номер документа"
-              value={formData.number}
+              value={formData.document_type_id === 4? "Номер создаться автоматом" : formData.number}
               onChange={(e) => handleChange('number', e.target.value)}
               fullWidth
               required
@@ -133,6 +171,9 @@ export const DocumentAddDialog: React.FC<DocumentAddDialogProps> = ({
                   </InputAdornment>
                 ),
               }}
+
+              disabled={formData.document_type_id === 4}
+
             />
             <TextField
               label="Дата"
@@ -168,6 +209,22 @@ export const DocumentAddDialog: React.FC<DocumentAddDialogProps> = ({
               ))}
             </Select>
           </FormControl>
+          {formData.document_type_id === 4 && (
+            <FormControl fullWidth>
+            <InputLabel>Инвентаризация зоны</InputLabel>
+            <Select
+              value={formData.zone_id}
+              label="Инвентаризация зоны"
+              onChange={(e) => handleChange('zone_id', Number(e.target.value))}
+            >
+              {storageZones.map((sz) => (
+                <MenuItem key={sz.id} value={sz.id}>
+                  {sz.наименование}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+          )}
 
           {/* Поле поставщика (только для приходных документов) */}
           {formData.document_type_id === 1 && suppliers.length > 0 && (
@@ -222,7 +279,7 @@ export const DocumentAddDialog: React.FC<DocumentAddDialogProps> = ({
           onClick={handleSubmit} 
           variant="contained" 
           color="primary"
-          disabled={!formData.number || !formData.document_type_id || (formData.document_type_id === 1 && !formData.company_id)}
+          disabled={!formData.document_type_id || (formData.document_type_id === 1 && !formData.company_id)}
         >
           {isEdit ? 'Сохранить' : 'Добавить'}
         </Button>
