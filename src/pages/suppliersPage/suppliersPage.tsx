@@ -50,12 +50,12 @@ import {
 import AdminOnly from '../../components/AdminOnly';
 
 // Конфигурация для типов компаний
-const typeConfig: Record<string, { icon: string; label: string; bgColor: string; color: string }> = {
-  'ООО': { icon: '🏢', label: 'ООО', bgColor: '#e3f2fd', color: '#1565c0' },
-  'ИП': { icon: '👤', label: 'ИП', bgColor: '#f3e5f5', color: '#7b1fa2' },
-  'АО': { icon: '🏛️', label: 'АО', bgColor: '#e8f5e8', color: '#2e7d32' },
-  'ЗАО': { icon: '🔒', label: 'ЗАО', bgColor: '#fff3e0', color: '#ef6c00' },
-  'ТОО': { icon: '🌐', label: 'ТОО', bgColor: '#fbe9e7', color: '#ff5722' },
+const typeConfig: Record<string, { label: string; bgColor: string; color: string }> = {
+  'ООО': { label: 'ООО', bgColor: '#e3f2fd', color: '#1565c0' },
+  'ИП': { label: 'ИП', bgColor: '#f3e5f5', color: '#7b1fa2' },
+  'АО': { label: 'АО', bgColor: '#e8f5e8', color: '#2e7d32' },
+  'ЗАО': { label: 'ЗАО', bgColor: '#fff3e0', color: '#ef6c00' },
+  'ТОО': { label: 'ТОО', bgColor: '#fbe9e7', color: '#ff5722' },
 };
 
 // Компонент для отображения типа компании
@@ -63,7 +63,6 @@ const TypeChip: React.FC<{ typeName: string | null }> = ({ typeName }) => {
   if (!typeName) return null;
   
   const config = typeConfig[typeName] || { 
-    icon: '🏢', 
     label: typeName, 
     bgColor: '#f5f5f5', 
     color: '#666' 
@@ -73,7 +72,6 @@ const TypeChip: React.FC<{ typeName: string | null }> = ({ typeName }) => {
     <Chip
       label={
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-          <span>{config.icon}</span>
           <span>{config.label}</span>
         </Box>
       }
@@ -150,11 +148,10 @@ const CompanyDialog: React.FC<CompanyDialogProps> = ({
               disabled={loading}
             >
               {companyTypes.map((type) => {
-                const config = typeConfig[type.name] || { icon: '🏢', label: type.name };
+                const config = typeConfig[type.name] || { label: type.name };
                 return (
                   <MenuItem key={type.id} value={type.id}>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <span>{config.icon}</span>
                       <Typography>{type.name}</Typography>
                     </Box>
                   </MenuItem>
@@ -536,7 +533,6 @@ export const SuppliersPage: React.FC = () => {
         <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
           {companyTypes.map((type) => {
             const config = typeConfig[type.name] || { 
-              icon: '🏢', 
               label: type.name, 
               bgColor: '#f5f5f5', 
               color: '#666' 
@@ -558,7 +554,6 @@ export const SuppliersPage: React.FC = () => {
                 }}
               >
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                  <Typography variant="h4">{config.icon}</Typography>
                   <Typography variant="h5" fontWeight={600} color={config.color}>
                     {count}
                   </Typography>
