@@ -160,7 +160,7 @@ export const DocumentAddDialog: React.FC<DocumentAddDialogProps> = ({
           <Box sx={{ display: 'flex', gap: 2 }}>
             <TextField
               label="Номер документа"
-              value={formData.document_type_id === 4? "Номер создаться автоматом" : formData.number}
+              value={formData.document_type_id !== 2 ? "Номер будет создан автоматом" : formData.number}
               onChange={(e) => handleChange('number', e.target.value)}
               fullWidth
               required
@@ -172,11 +172,11 @@ export const DocumentAddDialog: React.FC<DocumentAddDialogProps> = ({
                 ),
               }}
 
-              disabled={formData.document_type_id === 4}
+              disabled={formData.document_type_id !== 2}
 
             />
             <TextField
-              label="Дата"
+              label="Дата (ставится автоматом)"
               type="date"
               value={formData.date}
               onChange={(e) => handleChange('date', e.target.value)}
@@ -191,6 +191,7 @@ export const DocumentAddDialog: React.FC<DocumentAddDialogProps> = ({
                   </InputAdornment>
                 ),
               }}
+              disabled={formData.document_type_id !== 2}
             />
           </Box>
 
@@ -209,6 +210,7 @@ export const DocumentAddDialog: React.FC<DocumentAddDialogProps> = ({
               ))}
             </Select>
           </FormControl>
+          
           {formData.document_type_id === 4 && (
             <FormControl fullWidth>
             <InputLabel>Инвентаризация зоны</InputLabel>
