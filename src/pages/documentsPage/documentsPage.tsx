@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from "react";
 import {
   Box,
   Typography,
@@ -19,7 +19,7 @@ import {
   ListItemIcon,
   ListItemText,
   Chip,
-} from '@mui/material';
+} from "@mui/material";
 import {
   Search,
   Add,
@@ -32,11 +32,35 @@ import {
   Inventory,
   RemoveCircle,
   ArrowForward,
-} from '@mui/icons-material';
-import { SecondSidebar, DocumentLineDialog, DocumentAddDialog, DocumentDeleteDialog } from './../../components';
+} from "@mui/icons-material";
+import {
+  SecondSidebar,
+  DocumentLineDialog,
+  DocumentAddDialog,
+  DocumentDeleteDialog,
+} from "./../../components";
 
-import { DocumentType, documentTypeApi, Document, documentApi, DocumentCreate, DocumentUpdate } from './makeData';
-import { Company, getCompanies, productApi, getStorageZones, Product, documentLineApi, Category, Unit, categoryApi, unitApi } from '../../pages';
+import {
+  DocumentType,
+  documentTypeApi,
+  Document,
+  documentApi,
+  DocumentCreate,
+  DocumentUpdate,
+} from "./makeData";
+import {
+  Company,
+  getCompanies,
+  productApi,
+  getStorageZones,
+  Product,
+  documentLineApi,
+  Category,
+  Unit,
+  categoryApi,
+  unitApi,
+} from "../../pages";
+
 
 // Типы для категорий документов
 interface CategoryItem {
@@ -56,59 +80,70 @@ interface DocumentTypeChipProps {
   documentTypes: DocumentType[]; // Массив типов из БД
 }
 
-const DocumentTypeChip: React.FC<DocumentTypeChipProps> = ({ typeId, documentTypes }) => {
+const DocumentTypeChip: React.FC<DocumentTypeChipProps> = ({
+  typeId,
+  documentTypes,
+}) => {
   // Находим тип документа по ID
-  const documentType = documentTypes.find(type => type.id === typeId);
+  const documentType = documentTypes.find((type) => type.id === typeId);
 
   // Конфигурация для каждого типа
   const typeConfig = {
-    1: { // Приход (ID: 1)
-      bgColor: '#d4edda',
-      color: '#155724',
+    1: {
+      // Приход (ID: 1)
+      bgColor: "#d4edda",
+      color: "#155724",
       icon: <ShoppingCart fontSize="small" />,
-      label: 'Приход'
+      label: "Приход",
     },
-    2: { // Расход (ID: 2)
-      bgColor: '#f8d7da',
-      color: '#721c24',
+    2: {
+      // Расход (ID: 2)
+      bgColor: "#f8d7da",
+      color: "#721c24",
       icon: <ShoppingCart fontSize="small" />,
-      label: 'Расход'
+      label: "Расход",
     },
-    3: { // Перемещение (ID: 3)
-      bgColor: '#cce5ff',
-      color: '#004085',
+    3: {
+      // Перемещение (ID: 3)
+      bgColor: "#cce5ff",
+      color: "#004085",
       icon: <ArrowForward fontSize="small" />,
-      label: 'Перемещение'
+      label: "Перемещение",
     },
-    4: { // Инвентаризация (ID: 4)
-      bgColor: '#fff3cd',
-      color: '#856404',
+    4: {
+      // Инвентаризация (ID: 4)
+      bgColor: "#fff3cd",
+      color: "#856404",
       icon: <Inventory fontSize="small" />,
-      label: 'Инвентаризация'
+      label: "Инвентаризация",
     },
-    5: { // Списание (ID: 5)
-      bgColor: '#d1ecf1',
-      color: '#0c5460',
+    5: {
+      // Списание (ID: 5)
+      bgColor: "#d1ecf1",
+      color: "#0c5460",
       icon: <RemoveCircle fontSize="small" />,
-      label: 'Списание'
+      label: "Списание",
     },
-    6: { // Отчёт (ID: 6)
-      bgColor: '#e6ccff',
-      color: '#6610f2',
+    6: {
+      // Отчёт (ID: 6)
+      bgColor: "#e6ccff",
+      color: "#6610f2",
       icon: <Assessment fontSize="small" />,
-      label: 'Отчёт'
+      label: "Отчёт",
     },
   };
 
-  const config = documentType ? typeConfig[documentType.id as keyof typeof typeConfig] : {
-    bgColor: '#e0e0e0',
-    color: '#424242',
-    icon: <Description fontSize="small" />,
-    label: 'Неизвестный тип'
-  };
-  
+  const config = documentType
+    ? typeConfig[documentType.id as keyof typeof typeConfig]
+    : {
+        bgColor: "#e0e0e0",
+        color: "#424242",
+        icon: <Description fontSize="small" />,
+        label: "Неизвестный тип",
+      };
+
   return (
-    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+    <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
       <Chip
         icon={config.icon}
         label={config.label}
@@ -127,17 +162,19 @@ export const DocumentsPage: React.FC = () => {
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
-  const [selectedDocument, setSelectedDocument] = useState<Document | null>(null);
+  const [selectedDocument, setSelectedDocument] = useState<Document | null>(
+    null
+  );
   const [dialogOpen, setDialogOpen] = useState(false);
   const [fillDialogOpen, setFillDialogOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchTerm, setSearchTerm] = useState("");
   const [selectedTypeId, setSelectedTypeId] = useState<number | null>(null);
 
   const [editingDocument, setEditingDocument] = useState<Document | null>(null);
   const [documents, setDocuments] = useState<Document[]>([]);
-  const [documentTypes, setDocumentTypes] = useState<DocumentType[]>([]);       // Типы документов из бд
+  const [documentTypes, setDocumentTypes] = useState<DocumentType[]>([]); // Типы документов из бд
   const [companies, setCompanies] = useState<Company[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [storageZones, setStorageZones] = useState<any[]>([]);
@@ -152,47 +189,47 @@ export const DocumentsPage: React.FC = () => {
     try {
       const updatedProducts = await productApi.getAll();
       setProducts(updatedProducts);
-      console.log('🔄 Список товаров обновлен');
+      console.log("🔄 Список товаров обновлен");
     } catch (error) {
-      console.error('Ошибка обновления списка товаров:', error);
+      console.error("Ошибка обновления списка товаров:", error);
     }
   };
 
   useEffect(() => {
     // Первоначальная загрузка
     loadAllData();
-    
+
     // Настраиваем интервал для обновления каждые 10 секунд, НО ТОЛЬКО ЕСЛИ НЕ РЕДАКТИРУЕМ/НЕ ДОБАВЛЯЕМ
     const intervalId = setInterval(() => {
       if (!dialogOpen && !fillDialogOpen && !deleteDialogOpen) {
-        console.log('Автоматическое обновление данных...');
+        console.log("Автоматическое обновление данных...");
         loadAllData();
       } else {
-        console.log('Пропускаем автообновление: открыт диалог');
+        console.log("Пропускаем автообновление: открыт диалог");
       }
     }, 10000);
-    
+
     return () => {
       clearInterval(intervalId);
-      console.log('Интервал очищен');
+      console.log("Интервал очищен");
     };
   }, [dialogOpen, fillDialogOpen, deleteDialogOpen]);
 
   const loadAllData = async () => {
     setLoading(true);
     setError(null);
-    
+
     try {
       const [types, docs, comps, prods, zones, cats, unts] = await Promise.all([
         documentTypeApi.getAll(),
         documentApi.getAll(),
         getCompanies(),
-        productApi.getAll(), 
-        getStorageZones(),    
-        categoryApi.getAll(), 
-        unitApi.getAll()    
+        productApi.getAll(),
+        getStorageZones(),
+        categoryApi.getAll(),
+        unitApi.getAll(),
       ]);
-      
+
       setDocumentTypes(types);
       setDocuments(docs);
       setCompanies(comps);
@@ -201,51 +238,65 @@ export const DocumentsPage: React.FC = () => {
       setCategories(cats);
       setUnits(unts);
     } catch (err) {
-      setError('Не удалось загрузить данные');
-      console.error('Ошибка загрузки данных:', err);
+      setError("Не удалось загрузить данные");
+      console.error("Ошибка загрузки данных:", err);
     } finally {
       setLoading(false);
     }
-};
+  };
 
   // Категории для сайдбара
   const categorySections: CategorySection[] = [
     {
-      title: 'Типы документов',
-      items: documentTypes.map(type => ({
+      title: "Типы документов",
+      items: documentTypes.map((type) => ({
         text: type.name,
         icon: <Description />,
-        count: documents.filter(d => d.document_type_id === type.id).length,
+        count: documents.filter((d) => d.document_type_id === type.id).length,
       })),
     },
   ];
 
   // Фильтрация документов
-  const filteredDocuments = documents.filter(document => {
-  // Находим компанию по ID
-  const company = companies.find(c => c.id === document.company_id);
-  
-  const matchesSearch =
-    (document.number ? document.number.toLowerCase().includes(searchTerm.toLowerCase()) : false) ||
-    (document.comment ? document.comment.toLowerCase().includes(searchTerm.toLowerCase()) : false) ||
-    (document.date ? document.date.toLowerCase().includes(searchTerm.toLowerCase()) : false) ||
-    (company && company.name ? company.name.toLowerCase().includes(searchTerm.toLowerCase()) : false);
+  const filteredDocuments = documents.filter((document) => {
+    // Находим компанию по ID
+    const company = companies.find((c) => c.id === document.company_id);
 
-  const matchesType = !selectedTypeId || document.document_type_id === selectedTypeId;
+    const matchesSearch =
+      (document.number
+        ? document.number.toLowerCase().includes(searchTerm.toLowerCase())
+        : false) ||
+      (document.comment
+        ? document.comment.toLowerCase().includes(searchTerm.toLowerCase())
+        : false) ||
+      (document.date
+        ? document.date.toLowerCase().includes(searchTerm.toLowerCase())
+        : false) ||
+      (company && company.name
+        ? company.name.toLowerCase().includes(searchTerm.toLowerCase())
+        : false);
 
-  return matchesSearch && matchesType;
-});
+    const matchesType =
+      !selectedTypeId || document.document_type_id === selectedTypeId;
+
+    return matchesSearch && matchesType;
+  });
 
   const handleChangePage = (event: unknown, newPage: number) => {
     setPage(newPage);
   };
 
-  const handleChangeRowsPerPage = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleChangeRowsPerPage = (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
     setRowsPerPage(parseInt(event.target.value, 10));
     setPage(0);
   };
 
-  const handleMenuOpen = (event: React.MouseEvent<HTMLElement>, document: Document) => {
+  const handleMenuOpen = (
+    event: React.MouseEvent<HTMLElement>,
+    document: Document
+  ) => {
     setAnchorEl(event.currentTarget);
     setSelectedDocument(document);
   };
@@ -264,23 +315,22 @@ export const DocumentsPage: React.FC = () => {
   const handleEditDocument = async () => {
     if (selectedDocument) {
       setIsEditing(true);
-      
+
       try {
         const fullDocumentData = await documentApi.getById(selectedDocument.id);
-        
+
         // Сохраняем полные данные в отдельное состояние
         setEditingDocument(fullDocumentData);
-        
+
         // Открываем диалог
         setDialogOpen(true);
-        
       } catch (error) {
         // Если не удалось загрузить, используем данные из таблицы
         setEditingDocument(selectedDocument);
         setDialogOpen(true);
       }
     }
-    
+
     handleMenuClose();
   };
 
@@ -300,22 +350,23 @@ export const DocumentsPage: React.FC = () => {
       try {
         await documentApi.delete(selectedDocument.id);
         // Обновляем локальное состояние
-        setDocuments(prev => prev.filter(d => d.id !== selectedDocument.id));
+        setDocuments((prev) =>
+          prev.filter((d) => d.id !== selectedDocument.id)
+        );
         setDeleteDialogOpen(false);
         setSelectedDocument(null);
       } catch (error) {
-        console.error('Ошибка при удалении документа:', error);
+        console.error("Ошибка при удалении документа:", error);
       }
     }
   };
 
-  const handleDialogSubmit = async (formData: DocumentCreate) => {    
+  const handleDialogSubmit = async (formData: DocumentCreate) => {
     // Определяем ID документа для редактирования
     const documentId = editingDocument?.id || selectedDocument?.id;
-    
+
     try {
       if (isEditing && documentId) {
-        
         // Преобразуем DocumentCreate в DocumentUpdate
         const updateData: DocumentUpdate = {
           number: formData.number,
@@ -324,33 +375,31 @@ export const DocumentsPage: React.FC = () => {
           company_id: formData.company_id,
           document_type_id: formData.document_type_id,
         };
-        
+
         const updatedDoc = await documentApi.update(documentId, updateData);
-        
+
         // Обновляем локальное состояние
-        setDocuments(prev => prev.map(d => 
-          d.id === documentId ? updatedDoc : d
-        ));
-        
+        setDocuments((prev) =>
+          prev.map((d) => (d.id === documentId ? updatedDoc : d))
+        );
       } else {
         const newDocument = await documentApi.create(formData);
-        setDocuments(prev => [...prev, newDocument]);
+        setDocuments((prev) => [...prev, newDocument]);
       }
-      
+
       // Закрываем диалог и сбрасываем состояния
       setDialogOpen(false);
       setEditingDocument(null);
       setSelectedDocument(null);
-      
     } catch (error: any) {
-      console.error('Ошибка при сохранении документа:', error);
+      console.error("Ошибка при сохранении документа:", error);
     }
   };
 
   const handleCategoryClick = (category: string) => {
     // Находим тип документа по имени
-    const foundType = documentTypes.find(type => type.name === category);
-    
+    const foundType = documentTypes.find((type) => type.name === category);
+
     if (foundType) {
       if (selectedTypeId === foundType.id) {
         setSelectedTypeId(null); // Снять фильтр при повторном клике
@@ -366,28 +415,27 @@ export const DocumentsPage: React.FC = () => {
     try {
       // Загружаем полные данные документа
       const fullDocumentData = await documentApi.getById(document.id);
-      
+
       // Загружаем строки документа
       const documentLines = await documentLineApi.getByDocumentId(document.id);
-      
+
       // Добавляем строки к документу
       const documentWithLines = {
         ...fullDocumentData,
-        строки: documentLines // Добавляем строки
+        строки: documentLines, // Добавляем строки
       };
-      
+
       setSelectedDocument(documentWithLines as any); // Приведение типа
-      
     } catch (error) {
-      console.error('Ошибка загрузки документа:', error);
+      console.error("Ошибка загрузки документа:", error);
       setSelectedDocument(document);
     }
-    
+
     setFillDialogOpen(true);
   };
 
   return (
-    <Box sx={{ display: 'flex', height: '88vh' }}>
+    <Box sx={{ display: "flex", height: "88vh" }}>
       {/* Второстепенный сайдбар с типами документов */}
       <SecondSidebar
         sections={categorySections}
@@ -396,22 +444,25 @@ export const DocumentsPage: React.FC = () => {
       />
 
       {/* Основной контент */}
-      <Box sx={{ flex: 1, pl: 3, overflow: 'auto' }}>
+      <Box sx={{ flex: 1, pl: 3, overflow: "auto" }}>
         {/* Заголовок и панель управления */}
         <Box sx={{ mb: 4 }}>
           <Typography color="text.secondary" paragraph>
-            Управление документами: создание, редактирование и удаление документов
+            Управление документами: создание, редактирование и удаление
+            документов
           </Typography>
 
           {/* Панель поиска и управления */}
           <Paper sx={{ p: 2, mb: 3 }}>
-            <Box sx={{
-              display: 'flex',
-              flexDirection: { xs: 'column', md: 'row' },
-              gap: 2,
-              alignItems: { xs: 'stretch', md: 'center' },
-              justifyContent: 'space-between'
-            }}>
+            <Box
+              sx={{
+                display: "flex",
+                flexDirection: { xs: "column", md: "row" },
+                gap: 2,
+                alignItems: { xs: "stretch", md: "center" },
+                justifyContent: "space-between",
+              }}
+            >
               {/* Поле поиска */}
               <TextField
                 placeholder="Поиск по номеру, комментарию или дате"
@@ -425,30 +476,32 @@ export const DocumentsPage: React.FC = () => {
                   ),
                 }}
                 sx={{
-                  width: { xs: '100%', md: 600 },
-                  '& .MuiOutlinedInput-root': {
-                    backgroundColor: 'white',
-                  }
+                  width: { xs: "100%", md: 600 },
+                  "& .MuiOutlinedInput-root": {
+                    backgroundColor: "white",
+                  },
                 }}
               />
 
               {/* Статистика */}
-              <Box sx={{
-                display: 'flex',
-                gap: 1,
-                flexWrap: 'wrap',
-                justifyContent: { xs: 'center', md: 'flex-start' }
-              }}>
+              <Box
+                sx={{
+                  display: "flex",
+                  gap: 1,
+                  flexWrap: "wrap",
+                  justifyContent: { xs: "center", md: "flex-start" },
+                }}
+              >
                 <Chip
                   label={`Документов: ${documents.length}`}
                   variant="outlined"
-                  sx={{ minWidth: 120, justifyContent: 'center' }}
+                  sx={{ minWidth: 120, justifyContent: "center" }}
                 />
                 <Chip
                   label={`Найдено: ${filteredDocuments.length}`}
                   variant="outlined"
                   color="primary"
-                  sx={{ minWidth: 120, justifyContent: 'center' }}
+                  sx={{ minWidth: 120, justifyContent: "center" }}
                 />
               </Box>
 
@@ -458,9 +511,9 @@ export const DocumentsPage: React.FC = () => {
                 startIcon={<Add />}
                 onClick={handleAddDocument}
                 sx={{
-                  backgroundColor: '#1976d2',
+                  backgroundColor: "#1976d2",
                   minWidth: 170,
-                  alignSelf: { xs: 'stretch', md: 'center' }
+                  alignSelf: { xs: "stretch", md: "center" },
                 }}
               >
                 Добавить документ
@@ -470,7 +523,7 @@ export const DocumentsPage: React.FC = () => {
         </Box>
 
         {/* Таблица документов */}
-        <Paper sx={{ width: '100%', overflow: 'hidden' }}>
+        <Paper sx={{ width: "100%", overflow: "hidden" }}>
           <TableContainer sx={{ maxHeight: 550 }}>
             <Table stickyHeader>
               <TableHead>
@@ -480,7 +533,9 @@ export const DocumentsPage: React.FC = () => {
                   <TableCell width="140px">Тип документа</TableCell>
                   <TableCell width="80px">Строк</TableCell>
                   <TableCell width="300px">Комментарий</TableCell>
-                  <TableCell width="80px" align="right">Действия</TableCell>
+                  <TableCell width="80px" align="right">
+                    Действия
+                  </TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -488,15 +543,20 @@ export const DocumentsPage: React.FC = () => {
                   .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
                   .map((document) => {
                     // Находим компанию по ID
-                    const company = companies.find(c => c.id === document.company_id);
-                    
+                    const company = companies.find(
+                      (c) => c.id === document.company_id
+                    );
+
                     return (
                       <TableRow
                         key={document.id}
                         hover
-                        sx={{ 
-                          cursor: document.document_type_id !== 6 ? 'pointer' : 'default',
-                          '&:hover': { backgroundColor: 'action.hover' }
+                        sx={{
+                          cursor:
+                            document.document_type_id !== 6
+                              ? "pointer"
+                              : "default",
+                          "&:hover": { backgroundColor: "action.hover" },
                         }}
                         onDoubleClick={() => handleRowDoubleClick(document)}
                       >
@@ -524,7 +584,11 @@ export const DocumentsPage: React.FC = () => {
                         <TableCell>
                           <Typography variant="body2" color="text.secondary">
                             {document.document_type_id === 1 && company && (
-                              <Typography variant="caption" color="primary" fontWeight={600}>
+                              <Typography
+                                variant="caption"
+                                color="primary"
+                                fontWeight={600}
+                              >
                                 Поставщик: {company.name}
                                 <br />
                               </Typography>
