@@ -160,7 +160,7 @@ export const DocumentAddDialog: React.FC<DocumentAddDialogProps> = ({
           <Box sx={{ display: 'flex', gap: 2 }}>
             <TextField
               label="Номер документа"
-              value={formData.document_type_id !== 2 ? "Номер будет создан автоматом" : formData.number}
+              value={"Номер будет создан автоматом"}
               onChange={(e) => handleChange('number', e.target.value)}
               fullWidth
               required
@@ -172,7 +172,7 @@ export const DocumentAddDialog: React.FC<DocumentAddDialogProps> = ({
                 ),
               }}
 
-              disabled={formData.document_type_id !== 2}
+              disabled={true}
 
             />
             <TextField
@@ -191,7 +191,7 @@ export const DocumentAddDialog: React.FC<DocumentAddDialogProps> = ({
                   </InputAdornment>
                 ),
               }}
-              disabled={formData.document_type_id !== 2}
+              disabled={true}
             />
           </Box>
 
@@ -210,7 +210,7 @@ export const DocumentAddDialog: React.FC<DocumentAddDialogProps> = ({
               ))}
             </Select>
           </FormControl>
-          
+
           {formData.document_type_id === 4 && (
             <FormControl fullWidth>
             <InputLabel>Инвентаризация зоны</InputLabel>
@@ -229,7 +229,7 @@ export const DocumentAddDialog: React.FC<DocumentAddDialogProps> = ({
           )}
 
           {/* Поле поставщика (только для приходных документов) */}
-          {formData.document_type_id === 1 && suppliers.length > 0 && (
+          {formData.document_type_id === 1 || formData.document_type_id === 2 && suppliers.length > 0 && (
             <Autocomplete
               options={suppliers}
               value={selectedSupplier}
@@ -239,8 +239,8 @@ export const DocumentAddDialog: React.FC<DocumentAddDialogProps> = ({
               renderInput={(params) => (
                 <TextField
                   {...params}
-                  label="Поставщик"
-                  placeholder="Выберите поставщика"
+                  label={formData.document_type_id === 1 ? "Поставщик" : "Скупщик"}
+                  placeholder={formData.document_type_id === 1 ? "Выберите поставщика" : "Выберите скупщика"}
                   fullWidth
                 />
               )}
@@ -272,6 +272,9 @@ export const DocumentAddDialog: React.FC<DocumentAddDialogProps> = ({
               ),
             }}
             placeholder="Введите комментарий"
+            sx={{
+              display:'false'
+            }}
           />
         </Box>
       </DialogContent>

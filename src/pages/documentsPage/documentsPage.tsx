@@ -340,6 +340,11 @@ export const DocumentsPage: React.FC = () => {
             setDocuments(prev => [...prev, newRecDoc]);
             break;
           }
+          case 2: {
+            const newWrfDoc = await documentApi.createWrfDoc(formData);
+            setDocuments(prev => [...prev, newWrfDoc]);
+            break;
+          }
           case 3: {
             const newTrnDoc = await documentApi.createTrnDoc(formData);
             setDocuments(prev => [...prev, newTrnDoc]);

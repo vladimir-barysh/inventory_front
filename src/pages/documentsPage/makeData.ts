@@ -119,6 +119,11 @@ export const documentApi = {
     return response.data;
   },
 
+  createWrfDoc: async (doc: DocumentCreate): Promise<Document> => {
+    const response = await apiClient.post('/documents/create_wrf_doc', doc);
+    return response.data;
+  },
+
   // Обновить документ
   update: async (id: number, document: DocumentUpdate): Promise<Document> => {
     const response = await apiClient.put(`/documents/${id}`, document);
