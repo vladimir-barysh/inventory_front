@@ -94,13 +94,16 @@ export const DocumentLineDialog: React.FC<DocumentLineDialogProps> = ({
   open,
   onClose,
   document,
-  products,
+  products, // продукты из родителя
   storageZones,
   categories,
   units, 
   onSave,
   onProductsUpdated,
 }) => {
+  // Локальный кэш продуктов
+  const [localProducts, setLocalProducts] = useState<Product[]>(products);
+
   const [lines, setLines] = useState<EnhancedDocumentLine[]>([]);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [showNewProductForm, setShowNewProductForm] = useState(false);
@@ -119,9 +122,15 @@ export const DocumentLineDialog: React.FC<DocumentLineDialogProps> = ({
   // Загрузка строк документа при открытии диалога
   useEffect(() => {
     if (open && document.id) {
+      // При открытии диалога синхронизируем локальный кэш
+      setLocalProducts(products);
       loadDocumentLines();
     }
-  }, [open, document.id]);
+  }, [open, document.id, products]);
+
+  useEffect(() => {
+    setLocalProducts(products);
+  }, [products]);
 
   const loadDocumentLines = async () => {
     setLoadingLines(true);
@@ -158,7 +167,7 @@ export const DocumentLineDialog: React.FC<DocumentLineDialogProps> = ({
       
       // Обогащаем данные
       const enhancedLines: EnhancedDocumentLine[] = linesArray.map(line => {
-        const product = products.find(p => p.id === line.product_id);
+        const product = localProducts.find(p => p.id === line.product_id);
         const storageZoneSender = line.storage_zone_sender_id ? 
           storageZones.find(z => z.id === line.storage_zone_sender_id) : undefined;
         const storageZoneReceiver = line.storage_zone_receiver_id ? 
@@ -201,119 +210,146 @@ export const DocumentLineDialog: React.FC<DocumentLineDialogProps> = ({
   }
 
   const handleAddNewProduct = async () => {
-    // Валидация
-    if (!newProductForm.article || !newProductForm.name.trim()) {
-      alert('Заполните артикул и наименование товара');
+  // Валидация
+  if (!newProductForm.article || !newProductForm.name.trim()) {
+    alert('Заполните артикул и наименование товара');
+    return;
+  }
+
+  if (!newProductForm.category) {
+    alert('Выберите категорию товара');
+    return;
+  }
+
+  if (!newProductForm.unit) {
+    alert('Выберите единицу измерения');
+    return;
+  }
+
+  try {
+    setLoading(true);
+    
+    // 1. Находим ID категории по названию
+    const category = categories.find(c => c.name === newProductForm.category);
+    if (!category) {
+      alert('Категория не найдена в базе данных');
       return;
     }
 
-    if (!newProductForm.category) {
-      alert('Выберите категорию товара');
+    // 2. Находим ID единицы измерения по названию
+    const unit = units.find(u => u.name === newProductForm.unit);
+    if (!unit) {
+      alert('Единица измерения не найдена в базе данных');
       return;
     }
 
-    if (!newProductForm.unit) {
-      alert('Выберите единицу измерения');
+    // 3. Подготавливаем данные для создания товара
+    const productData: ProductCreate = {
+      article: newProductForm.article,
+      name: newProductForm.name.trim(),
+      purchase_price: newProductForm.purchase_price || 0,
+      sell_price: newProductForm.sell_price || 0,
+      category_id: category.id,
+      unit_id: unit.id
+    };
+
+    // 4. Создаем товар через API
+    const productResponse = await productApi.create(productData) as unknown as ApiResponse<number>;
+
+    // 5. Получаем ID созданного товара
+    const productId = productResponse.message; // message содержит ID
+    
+    if (!productId) {
+      console.error('Не удалось получить ID созданного товара');
+      alert('Ошибка: не удалось получить идентификатор созданного товара');
       return;
     }
 
-    try {
-      setLoading(true);
-      
-      // 1. Находим ID категории по названию
-      const category = categories.find(c => c.name === newProductForm.category);
-      if (!category) {
-        alert('Категория не найдена в базе данных');
-        return;
-      }
+    // 6. Создаем объект нового товара для локального кэша
+    const newProduct: Product = {
+      id: productId as number,
+      article: newProductForm.article,
+      name: newProductForm.name.trim(),
+      purchase_price: newProductForm.purchase_price || 0,
+      sell_price: newProductForm.sell_price || 0,
+      category_id: category.id,
+      unit_id: unit.id,
+      is_active: 1
+    };
 
-      // 2. Находим ID единицы измерения по названию
-      const unit = units.find(u => u.name === newProductForm.unit);
-      if (!unit) {
-        alert('Единица измерения не найдена в базе данных');
-        return;
-      }
+    // 7. СРАЗУ добавляем в локальный кэш
+    setLocalProducts(prev => [...prev, newProduct]);
 
-      // 3. Подготавливаем данные для создания товара
-      const productData: ProductCreate = {
-        article: newProductForm.article,
-        name: newProductForm.name.trim(),
-        purchase_price: newProductForm.purchase_price || 0,
-        sell_price: newProductForm.sell_price || 0,
-        category_id: category.id,
-        unit_id: unit.id
-      };
+    // 8. Автоматически добавляем товар в документ
+    const lineData: DocumentLineCreate = {
+      document_id: document.id,
+      product_id: productId as number,
+      quantity: 1,
+      actual_quantity: 1,
+      storage_zone_sender_id: undefined,
+      storage_zone_receiver_id: undefined
+    };
 
-      // 4. Создаем товар через API
-      const productResponse = await productApi.create(productData) as unknown as ApiResponse<number>;
-
-      // 5. Получаем ID созданного товара
-      const productId = productResponse.message; // message содержит ID
-      
-      if (!productId) {
-        console.error('Не удалось получить ID созданного товара');
-        alert('Ошибка: не удалось получить идентификатор созданного товара');
-        return;
-      }
-
-      // 6. Автоматически добавляем товар в документ
-      const lineData: DocumentLineCreate = {
-        document_id: document.id,
-        product_id: productId as number,
-        quantity: 1,
-        actual_quantity: 1,
-        storage_zone_sender_id: undefined,
-        storage_zone_receiver_id: undefined
-      };
-
-      // 7. Заполняем зону хранения для приходных накладных
-      if (document.document_type_id === 1 && newProductForm.storage_zone_id) {
-        lineData.storage_zone_receiver_id = newProductForm.storage_zone_id;
-      }
-
-      // 8. Добавляем строку документа
-      const lineResponse = await documentLineApi.create(lineData);
-      console.log('Товар добавлен в документ:', lineResponse);
-
-      // 9. Уведомляем родительский компонент об обновлении товаров
-      if (onProductsUpdated) {
-        onProductsUpdated();
-      }
-      
-      // Задержка
-      await new Promise(resolve => setTimeout(resolve, 1000));
-
-      // 10 Обновляем список строк документа
-      await loadDocumentLines();
-
-      // 11.брасываем форму
-      setNewProductForm({
-        article: 0,
-        name: '',
-        category: '',
-        unit: 'шт',
-        purchase_price: 0,
-        sell_price: 0,
-        storage_zone_id: null,
-      });
-      
-      setShowNewProductForm(false);
-
-    } catch (error: any) {
-      console.error('Ошибка создания товара:', error);
-      
-      let errorMessage = 'Ошибка создания товара';
-      if (error.response?.data?.detail) {
-        errorMessage = error.response.data.detail;
-      } else if (error.message) {
-        errorMessage = error.message;
-      }
-      
-      alert(`Ошибка: ${errorMessage}`);
-    } finally {
-      setLoading(false);
+    // 9. Заполняем зону хранения для приходных накладных
+    if (document.document_type_id === 1 && newProductForm.storage_zone_id) {
+      lineData.storage_zone_receiver_id = newProductForm.storage_zone_id;
     }
-  };
+
+    // 10. Добавляем строку документа
+    const lineResponse = await documentLineApi.create(lineData);
+    
+    // 11. Создаем обогащенную строку с новым товаром из локального кэша
+    const enhancedLine: EnhancedDocumentLine = {
+      ...lineResponse,
+      product: newProduct,
+      storageZoneSender: lineData.storage_zone_sender_id ? 
+        storageZones.find(z => z.id === lineData.storage_zone_sender_id) : undefined,
+      storageZoneReceiver: lineData.storage_zone_receiver_id ? 
+        storageZones.find(z => z.id === lineData.storage_zone_receiver_id) : undefined,
+      purchase_price: newProduct.purchase_price,
+      sell_price: newProduct.sell_price,
+      article: newProduct.article,
+      name: newProduct.name,
+      category: newProductForm.category, // Используем имя категории из формы
+      unit: newProductForm.unit,         // Используем имя единицы из формы
+    };
+
+    // 12. Добавляем новую строку в состояние
+    setLines(prev => [...prev, enhancedLine]);
+
+    // 13. Уведомляем родительский компонент об обновлении товаров
+    if (onProductsUpdated) {
+      onProductsUpdated();
+    }
+
+    // 14. Сбрасываем форму
+    setNewProductForm({
+      article: 0,
+      name: '',
+      category: '',
+      unit: 'шт',
+      purchase_price: 0,
+      sell_price: 0,
+      storage_zone_id: null,
+    });
+    
+    setShowNewProductForm(false);
+
+  } catch (error: any) {
+    console.error('Ошибка создания товара:', error);
+    
+    let errorMessage = 'Ошибка создания товара';
+    if (error.response?.data?.detail) {
+      errorMessage = error.response.data.detail;
+    } else if (error.message) {
+      errorMessage = error.message;
+    }
+    
+    alert(`Ошибка: ${errorMessage}`);
+  } finally {
+    setLoading(false);
+  }
+};
 
 const validateNewProductForm = (): boolean => {
     const errors = [];
@@ -454,11 +490,25 @@ const validateNewProductForm = (): boolean => {
     const lineToUpdate = lines.find(line => line.id === lineId);
     if (!lineToUpdate) return;
 
+    // Сохраняем старое значение для отката
+    const oldValue = lineToUpdate[field as keyof EnhancedDocumentLine];
+    
+    // Сразу обновляем визуально (оптимистичное обновление)
+    setLines(prev => prev.map(line => 
+      line.id === lineId 
+        ? { 
+            ...line, 
+            [field]: value === '' ? null : value 
+          } 
+        : line
+    ));
+
+    // Подготавливаем данные для отправки
     const updateData: DocumentLineUpdate = {};
 
     switch (field) {
       case 'quantity':
-        updateData.quantity = Number(value);
+        updateData.quantity = Number(value) || 0;
         break;
       case 'storage_zone_sender_id':
         updateData.storage_zone_sender_id = value ? Number(value) : null;
@@ -466,45 +516,57 @@ const validateNewProductForm = (): boolean => {
       case 'storage_zone_receiver_id':
         updateData.storage_zone_receiver_id = value ? Number(value) : null;
         break;
+      default:
+        return;
     }
 
     try {
-      setLoading(true);
+      // Отправляем на сервер
       const updatedLine = await documentLineApi.update(lineId, updateData);
       
-      // Находим название категории по ID
-      const categoryName = lineToUpdate.product?.category_id ? 
-        categories.find(c => c.id === lineToUpdate.product!.category_id)?.name : undefined;
+      console.log('✅ Строка обновлена:', updatedLine);
       
-      // Находим название единицы измерения по ID
-      const unitName = lineToUpdate.product?.unit_id ? 
-        units.find(u => u.id === lineToUpdate.product!.unit_id)?.name : undefined;
-
-      // Обновляем строку в состоянии
+      // Если нужно, обновляем с данными с сервера
       setLines(prev => prev.map(line => 
         line.id === lineId 
           ? { 
               ...line, 
               ...updatedLine,
+              // Сохраняем дополнительные данные
               product: line.product,
               purchase_price: line.purchase_price,
               sell_price: line.sell_price,
               article: line.article,
               name: line.name,
-              category: categoryName,
-              unit: unitName,
+              category: line.category,
+              unit: line.unit,
             } 
           : line
       ));
+      
     } catch (error: any) {
-      console.error('Ошибка обновления строки:', error);
-      alert(error.response?.data?.detail || 'Не удалось обновить строку документа');
-    } finally {
-      setLoading(false);
+      console.error('❌ Ошибка обновления строки:', error);
+      
+      // Откатываем изменение при ошибке
+      setLines(prev => prev.map(line => 
+        line.id === lineId 
+          ? { 
+              ...line, 
+              [field]: oldValue 
+            } 
+          : line
+      ));
+      
+      // Показываем ошибку пользователю
+      const errorMessage = error.response?.data?.detail || 
+                          error.message || 
+                          'Не удалось обновить строку документа';
+      
+      alert(`Ошибка: ${errorMessage}`);
     }
   };
 
-  const handleStringFieldChange = (field: 'name' | 'category' | 'unit', value: string) => {
+const handleStringFieldChange = (field: 'name' | 'category' | 'unit', value: string) => {
   setNewProductForm(prev => ({ ...prev, [field]: value }));
 };
 
@@ -1078,7 +1140,7 @@ const handleStorageZoneChange = (value: number | null) => {
   };
 
   // Фильтруем товары, которые уже есть в документе
-  const availableProducts = products.filter(p => 
+  const availableProducts = localProducts.filter(p => 
     !lines.some(l => l.product_id === p.id)
   );
 
@@ -1529,9 +1591,6 @@ const handleStorageZoneChange = (value: number | null) => {
           </Typography>
         </Box>
         <Box sx={{ display: 'flex', gap: 1 }}>
-          <Button onClick={onClose} variant="outlined" disabled={loading}>
-            Закрыть без сохранения
-          </Button>
           <Button
             onClick={handleSave}
             variant="contained"
