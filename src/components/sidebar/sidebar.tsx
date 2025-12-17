@@ -40,6 +40,7 @@ const menuSections: MenuSection[] = [
     title: 'Документы',
     items: [
       { text: 'Документы', icon: <Folder />, path: '/documents' },
+      { text: 'Отчёты', icon: <Folder />, path: '/reports' },
     ]
   },
   {
@@ -50,7 +51,7 @@ const menuSections: MenuSection[] = [
       { text: 'Зоны хранения', icon: <Warehouse />, path: '/storage' },
       { text: 'Сотрудники', icon: <People />, path: '/employees' },
     ]
-  },
+  }
 ];
 
 export const Sidebar: React.FC<SidebarProps> = ({ 

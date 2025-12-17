@@ -13,6 +13,8 @@ import { AuthProvider, useAuth } from '../src/pages/authPage/authContext';
 import LoginModal from '../src/pages/authPage/authPage';
 import ProtectedRoute from '../src/pages/authPage/ProtectedRoute';
 
+import ReportsPage from './pages/reportsPage/ReportsPage';
+
 // Компонент для основной части приложения (после авторизации)
 const MainApp = () => {
   console.log('=== MainApp рендерится ===');
@@ -60,6 +62,7 @@ const MainApp = () => {
                 <Route path="/employees" element={<EmployeesPage />} />
                 <Route path="/products" element={<ProductsPage />} /> 
                 <Route path="*" element={<Navigate to="/" replace />} />
+                <Route path="/reports" element={<ReportsPage />} />
               </Routes>
             </Box>
           </Box>
