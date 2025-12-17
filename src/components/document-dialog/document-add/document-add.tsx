@@ -235,7 +235,7 @@ export const DocumentAddDialog: React.FC<DocumentAddDialogProps> = ({
           )}
 
           {/* Поле поставщика */}
-          {formData.document_type_id === 1 || formData.document_type_id === 2 && suppliers.length > 0 && (
+          {(formData.document_type_id === 1 || formData.document_type_id === 2) && suppliers.length > 0 && (
             <Autocomplete
               options={suppliers}
               value={selectedSupplier}
