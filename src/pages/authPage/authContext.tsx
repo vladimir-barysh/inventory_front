@@ -28,12 +28,21 @@ interface AuthContextType {
   loading: boolean;
 }
 
+let globalUser: User | null = null;
+let globalToken: string | null = null;
+
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+
+   // Обновляем глобальные переменные при изменении состояния
+  useEffect(() => {
+    globalUser = user;
+    globalToken = token;
+  }, [user, token]);
 
   const validateToken = useCallback(async (tokenToValidate: string) => {
     try {
@@ -158,6 +167,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       {children}
     </AuthContext.Provider>
   );
+};
+
+export const getCurrentUser = (): User | null => {
+  return globalUser;
+};
+
+// Функция для получения токена
+export const getCurrentToken = (): string | null => {
+  return globalToken;
 };
 
 export const useAuth = () => {

@@ -14,6 +14,8 @@ export interface Document {
   comment: string;
   company_id: number; 
   document_type_id: number; 
+  zone_id: number;
+  employee_id: number;
 }
 
 // Типы для создания/обновления документа
@@ -23,7 +25,9 @@ export interface DocumentCreate {
   comment?: string; 
   company_id?: number;
   document_type_id: number;
-}
+  zone_id?: number;
+  employee_id?: number;
+}  
 
 export interface DocumentUpdate {
   number?: string;
@@ -97,6 +101,26 @@ export const documentApi = {
   // Создать новый документ
   create: async (document: DocumentCreate): Promise<Document> => {
     const response = await apiClient.post('/documents/', document);
+    return response.data;
+  },
+
+  createInvDoc: async (doc: DocumentCreate): Promise<Document> => {
+    const response = await apiClient.post('/documents/create_inv_doc', doc);
+    return response.data;
+  },
+
+  createRecDoc: async (doc: DocumentCreate): Promise<Document> => {
+    const response = await apiClient.post('/documents/create_rec_doc', doc);
+    return response.data;
+  },
+
+  createTrnDoc: async (doc: DocumentCreate): Promise<Document> => {
+    const response = await apiClient.post('/documents/create_trn_doc', doc);
+    return response.data;
+  },
+
+  createWrfDoc: async (doc: DocumentCreate): Promise<Document> => {
+    const response = await apiClient.post('/documents/create_wrf_doc', doc);
     return response.data;
   },
 
