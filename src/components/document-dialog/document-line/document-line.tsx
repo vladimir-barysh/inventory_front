@@ -112,8 +112,8 @@ export const DocumentLineDialog: React.FC<DocumentLineDialogProps> = ({
     name: '',
     category: '',
     unit: 'шт',
-    purchase_price: 0,
-    sell_price: 0,
+    purchase_price: 1,
+    sell_price: 1,
     storage_zone_id: null,
   });
   const [loading, setLoading] = useState(false);
@@ -210,21 +210,58 @@ export const DocumentLineDialog: React.FC<DocumentLineDialogProps> = ({
   }
 
   const handleAddNewProduct = async () => {
-  // Валидация
-  if (!newProductForm.article || !newProductForm.name.trim()) {
-    alert('Заполните артикул и наименование товара');
-    return;
-  }
-
-  if (!newProductForm.category) {
-    alert('Выберите категорию товара');
-    return;
-  }
-
-  if (!newProductForm.unit) {
-    alert('Выберите единицу измерения');
-    return;
-  }
+    const errors = [];
+    
+    // Проверка артикула (должен быть положительным числом)
+    if (!newProductForm.article || newProductForm.article <= 0) {
+      errors.push('Артикул должен быть положительным числом');
+    }
+    
+    // Проверка наименования
+    if (!newProductForm.name.trim()) {
+      errors.push('Введите наименование товара');
+    }
+    
+    // Проверка категории
+    if (!newProductForm.category) {
+      errors.push('Выберите категорию товара');
+    }
+    
+    // Проверка единицы измерения
+    if (!newProductForm.unit) {
+      errors.push('Выберите единицу измерения');
+    }
+    
+    // Проверка цены закупки
+    if (newProductForm.purchase_price <= 0) {
+      errors.push('Цена закупки должна быть положительным числом');
+    }
+    
+    // Проверка цены продажи
+    if (newProductForm.sell_price <= 0) {
+      errors.push('Цена продажи должна быть положительным числом');
+    }
+    
+    // Проверка зоны хранения (для приходной накладной)
+    if (document.document_type_id === 1 && !newProductForm.storage_zone_id) {
+      errors.push('Выберите зону хранения для приходной накладной');
+    }
+    
+    // Если есть ошибки - показываем их
+    if (errors.length > 0) {
+      alert(errors.join('\n'));
+      return;
+    }
+  
+    // Дополнительная проверка: цены
+    if (newProductForm.sell_price > 0 && newProductForm.purchase_price > 0) {
+      if (newProductForm.sell_price < newProductForm.purchase_price) {
+        const confirmMessage = 'Цена продажи меньше цены закупки. Вы уверены, что хотите продолжить?';
+        if (!window.confirm(confirmMessage)) {
+          return;
+        }
+      }
+    }
 
   try {
     setLoading(true);
@@ -328,8 +365,8 @@ export const DocumentLineDialog: React.FC<DocumentLineDialogProps> = ({
       name: '',
       category: '',
       unit: 'шт',
-      purchase_price: 0,
-      sell_price: 0,
+      purchase_price: 1,
+      sell_price: 1,
       storage_zone_id: null,
     });
     
@@ -1363,7 +1400,7 @@ const handleStorageZoneChange = (value: number | null) => {
                                 handleAddNewProduct();
                               }
                             }}
-                            disabled={!newProductForm.article || !newProductForm.name.trim() || loading}
+                            disabled={loading}
                             fullWidth
                           >
                             {loading ? 'Создание...' : 'Создать товар и добавить в документ'}
