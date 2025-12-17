@@ -5,7 +5,9 @@ import CssBaseline from '@mui/material/CssBaseline';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import { Header, Sidebar } from './components';
-import { DocumentsPage, SuppliersPage, StoragePage, EmployeesPage, ProductsPage } from './pages';
+import { DocumentsPage, SuppliersPage, StoragePage, ProductsPage } from './pages';
+import EmployeesPage from './pages/employeesPage/employeesPage';
+
 import { theme } from './theme';
 import { AuthProvider, useAuth } from '../src/pages/authPage/authContext';
 import LoginModal from '../src/pages/authPage/authPage';
