@@ -117,8 +117,8 @@ const DocumentTypeChip: React.FC<DocumentTypeChipProps> = ({
       icon: <Inventory fontSize="small" />,
       label: "Инвентаризация",
     },
-    5: {
-      // Списание (ID: 5)
+    9: {
+      // Списание (ID: 9)
       bgColor: "#d1ecf1",
       color: "#0c5460",
       icon: <RemoveCircle fontSize="small" />,
@@ -611,13 +611,13 @@ export const DocumentsPage: React.FC = () => {
                         </TableCell>
                         <TableCell>
                           <Typography variant="body2" color="text.secondary">
-                            {document.document_type_id === 1 && company && (
+                            {(document.document_type_id === 1 || document.document_type_id === 2) && company && (
                               <Typography
                                 variant="caption"
                                 color="primary"
                                 fontWeight={600}
                               >
-                                Поставщик: {company.name}
+                                Компания: {company.name}
                                 <br />
                               </Typography>
                             )}

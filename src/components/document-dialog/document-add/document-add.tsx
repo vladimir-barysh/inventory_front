@@ -158,60 +158,66 @@ export const DocumentAddDialog: React.FC<DocumentAddDialogProps> = ({
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 2 }}>
           {/* Основная информация */}
           <Box sx={{ display: 'flex', gap: 2 }}>
-            <TextField
-              label="Номер документа"
-              value={"Номер будет создан автоматом"}
-              onChange={(e) => handleChange('number', e.target.value)}
-              fullWidth
-              required
-              InputProps={{
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <Description fontSize="small" />
-                  </InputAdornment>
-                ),
-              }}
+            {!isEdit  && (
+              <TextField
+                label="Номер документа"
+                defaultValue={formData.number}
+                placeholder={formData.document_type_id === 9 ? "Введите номер документа" : "Номер будет создан автоматоматически"}
+                onChange={(e) => handleChange('number', e.target.value)}
+                fullWidth
+                required
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <Description fontSize="small" />
+                    </InputAdornment>
+                  ),
+                }}
 
-              disabled={true}
-
-            />
-            <TextField
-              label="Дата (ставится автоматом)"
-              type="date"
-              value={formData.date}
-              onChange={(e) => handleChange('date', e.target.value)}
-              fullWidth
-              InputLabelProps={{
-                shrink: true,
-              }}
-              InputProps={{
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <DateRange fontSize="small" />
-                  </InputAdornment>
-                ),
-              }}
-              disabled={true}
-            />
+                disabled={formData.document_type_id !== 9}
+              />
+            )}
+            {!isEdit && (
+              <TextField
+                label="Дата"
+                type="date"
+                value={formData.date}
+                onChange={(e) => handleChange('date', e.target.value)}
+                fullWidth
+                InputLabelProps={{
+                  shrink: true,
+                }}
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <DateRange fontSize="small" />
+                    </InputAdornment>
+                  ),
+                }}
+                disabled={true}
+              />
+            )}
           </Box>
 
-          {/* Тип документа из БД */}
-          <FormControl fullWidth>
-            <InputLabel>Тип документа</InputLabel>
-            <Select
-              value={formData.document_type_id}
-              label="Тип документа"
-              onChange={(e) => handleChange('document_type_id', Number(e.target.value))}
-            >
-              {documentTypes.map((type) => (
-                <MenuItem key={type.id} value={type.id}>
-                  {type.name}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
+          {!isEdit && (
+            <FormControl fullWidth>
+              <InputLabel>Тип документа</InputLabel>
+              <Select
+                value={formData.document_type_id}
+                label="Тип документа"
+                onChange={(e) => handleChange('document_type_id', Number(e.target.value))}
+              >
+                {documentTypes.map((type) => (
+                  <MenuItem key={type.id} value={type.id}>
+                    {type.name}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          )}
+          
 
-          {formData.document_type_id === 4 && (
+          {!isEdit && formData.document_type_id === 4 && (
             <FormControl fullWidth>
             <InputLabel>Инвентаризация зоны</InputLabel>
             <Select
@@ -228,7 +234,7 @@ export const DocumentAddDialog: React.FC<DocumentAddDialogProps> = ({
           </FormControl>
           )}
 
-          {/* Поле поставщика (только для приходных документов) */}
+          {/* Поле поставщика */}
           {formData.document_type_id === 1 || formData.document_type_id === 2 && suppliers.length > 0 && (
             <Autocomplete
               options={suppliers}
@@ -256,26 +262,27 @@ export const DocumentAddDialog: React.FC<DocumentAddDialogProps> = ({
             />
           )}
 
-          {/* Комментарий */}
-          <TextField
-            label="Комментарий"
-            value={formData.comment || ''}
-            onChange={(e) => handleChange('comment', e.target.value)}
-            fullWidth
-            multiline
-            rows={formData.document_type_id === 1 ? 2 : 3}
-            InputProps={{
-              startAdornment: (
-                <InputAdornment position="start">
-                  <Comment fontSize="small" />
-                </InputAdornment>
-              ),
-            }}
-            placeholder="Введите комментарий"
-            sx={{
-              display:'false'
-            }}
-          />
+          {(isEdit || formData.document_type_id === 9) && (
+            <TextField
+              label="Комментарий"
+              value={formData.comment || ''}
+              onChange={(e) => handleChange('comment', e.target.value)}
+              fullWidth
+              multiline
+              rows={2}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <Comment fontSize="small" />
+                  </InputAdornment>
+                ),
+              }}
+              placeholder="Введите комментарий"
+              sx={{
+                display:'false'
+              }}
+            />
+          )}
         </Box>
       </DialogContent>
       <DialogActions>
