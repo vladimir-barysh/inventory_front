@@ -36,12 +36,24 @@ const IndicatorsTable: React.FC<IndicatorsTableProps> = ({
   );
 
   const totalProducts = products.length;
-  const totalCapacity = totalProducts * 3;
+  const totalCapacity = totalProducts * 2.4;
   const warehouseUsagePercent = totalCapacity
     ? (totalProducts / totalCapacity) * 100
     : 0;
 
-  const accuracyPercent = 95;
+  const accountingTotal = documentLines.reduce((sum, line) => {
+    return sum + (line.quantity ?? 0);
+  }, 0);
+
+  const totalDeviation = documentLines.reduce((sum, line) => {
+    if (line.actual_quantity === null || line.actual_quantity === undefined) {
+      return sum;
+    }
+    return sum + Math.abs(line.quantity - line.actual_quantity);
+  }, 0);
+
+  const accuracyPercent =
+    accountingTotal > 0 ? (1 - totalDeviation / accountingTotal) * 100 : 0;
 
   const totalValue = products.reduce((sum, product) => {
     const lines = documentLines.filter(
@@ -83,9 +95,10 @@ const IndicatorsTable: React.FC<IndicatorsTableProps> = ({
     },
     accuracyPercent > 0 && {
       name: "Точность учета",
-      value: accuracyPercent + "%",
+      value: accuracyPercent.toFixed(2) + "%",
       unit: "%",
-      formula: "(1 - (Сумма расхождений) / (Общий учетный остаток)) × 100%",
+      formula:
+        "(1 − Σ|учётное количество − фактическое количество| / Σ учётного количества) × 100%",
     },
     avgPrice > 0 && {
       name: "Средняя цена товара на складе",
