@@ -77,6 +77,7 @@ interface EnhancedDocumentLine extends ApiDocumentLine {
   name?: string;
   category?: string; // Название категории
   unit?: string;     // Название единицы измерения
+  actual_quantity?: number;
 }
 
 // Интерфейс для нового товара
@@ -553,6 +554,9 @@ const validateNewProductForm = (): boolean => {
       case 'storage_zone_receiver_id':
         updateData.storage_zone_receiver_id = value ? Number(value) : null;
         break;
+      case 'actual_quantity':  // <-- ДОБАВЬТЕ ЭТО
+        updateData.actual_quantity = Number(value) || 0;
+        break;
       default:
         return;
     }
@@ -636,6 +640,7 @@ const handleStorageZoneChange = (value: number | null) => {
       totalAmount: 0,
       totalPurchaseAmount: 0,
       profit: 0,
+      totalActualQuantity: 0,
     };
 
     lines.forEach(line => {
@@ -656,7 +661,10 @@ const handleStorageZoneChange = (value: number | null) => {
           break;
 
         case 4: // Инвентаризация
+          // Считаем по фактическому количеству
           totals.totalAmount += (line.sell_price || 0) * line.quantity;
+          // Считаем разницу между учётом и фактическим
+          totals.totalActualQuantity += line.actual_quantity || 0;
           break;
 
         case 5: // Списание
@@ -920,18 +928,33 @@ const handleStorageZoneChange = (value: number | null) => {
             <TableCell>{line.name || 'Без названия'}</TableCell>
             <TableCell>{line.unit || 'шт'}</TableCell>
             <TableCell>
+              {/* Количество по учёту - только для чтения */}
               <TextField
                 type="number"
-                value={line.quantity}
-                onChange={(e) => handleFieldChange(line.id, 'quantity', parseInt(e.target.value) || 0)}
+                value={ line.quantity}
+                size="small"
+                sx={{ width: '80px' }}
+                inputProps={{ min: 0, readOnly: true }}
+                disabled
+                InputProps={{
+                  readOnly: true,
+                }}
+              />
+            </TableCell>
+            <TableCell>
+              {/* Фактическое количество - редактируемое */}
+              <TextField
+                type="number"
+                value={line.actual_quantity}
                 size="small"
                 sx={{ width: '80px' }}
                 inputProps={{ min: 0 }}
+                onChange={(e) => handleFieldChange(line.id, 'actual_quantity', parseInt(e.target.value) || 0)}
                 disabled={loading}
               />
             </TableCell>
             <TableCell sx={{ fontWeight: 600, whiteSpace: 'nowrap' }}>
-              {((line.sell_price || 0) * line.quantity).toLocaleString('ru-RU')} ₽
+              {((line.sell_price || 0) * (line.quantity)).toLocaleString('ru-RU')} ₽
             </TableCell>
             <TableCell align="center">
               <IconButton
@@ -1061,6 +1084,7 @@ const handleStorageZoneChange = (value: number | null) => {
             <TableCell>Наименование</TableCell>
             <TableCell width="90px">Ед. изм.</TableCell>
             <TableCell width="120px">Кол-во по учёту</TableCell>
+            <TableCell width="120px">Фактическое кол-во</TableCell>
             <TableCell width="120px">Сумма</TableCell>
             <TableCell width="60px" align="center">Действия</TableCell>
           </>
@@ -1505,13 +1529,38 @@ const handleStorageZoneChange = (value: number | null) => {
                       </>
                     )}
                     
+                    {/* Для инвентаризации показываем разницу */}
                     {document.document_type_id === 4 && (
-                      <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                        <Typography variant="body2">Сумма по учёту:</Typography>
-                        <Typography variant="body2" fontWeight={600}>
-                          {totals.totalAmount.toLocaleString('ru-RU')} ₽
-                        </Typography>
-                      </Box>
+                      <>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <Typography variant="body2">По учёту:</Typography>
+                          <Typography variant="body2" fontWeight={600}>
+                            {lines.reduce((sum, line) => sum + line.quantity, 0)} ед.
+                          </Typography>
+                        </Box>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <Typography variant="body2">Фактически:</Typography>
+                          <Typography variant="body2" fontWeight={600}>
+                            {lines.reduce((sum, line) => sum + (line.actual_quantity || 0), 0)} ед.
+                          </Typography>
+                        </Box>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <Typography variant="body2">Разница:</Typography>
+                          <Typography 
+                            variant="body2" 
+                            fontWeight={600}
+                            color={
+                              lines.reduce((sum, line) => sum + (line.actual_quantity || 0), 0) - 
+                              lines.reduce((sum, line) => sum + line.quantity, 0) === 0 
+                                ? 'success.main'   // Зеленый только при точном совпадении (0)
+                                : 'error.main'     // Красный при любой разнице (положительной ИЛИ отрицательной)
+                            }
+                          >
+                            {lines.reduce((sum, line) => sum + (line.actual_quantity || 0), 0) - 
+                            lines.reduce((sum, line) => sum + line.quantity, 0)} ед.
+                          </Typography>
+                        </Box>
+                      </>
                     )}
                     
                     {document.document_type_id === 5 && (

@@ -60,6 +60,7 @@ export interface DocumentLineCreate {
 // Обновление строки документа
 export interface DocumentLineUpdate {
   quantity?: number;
+  actual_quantity?: number;
   storage_zone_sender_id?: number | null;
   storage_zone_receiver_id?: number | null;
 }
